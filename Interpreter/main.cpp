@@ -1,13 +1,11 @@
-// Example program
-#include <iostream>
 #include <string>
-#include <cctype>
-#include <cmath>
-#include <vector>
-#include <map>
-#include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
+#include "utils.h"
+#include "Token.h"
+#include "Symbol.h"
+#include "ASTNodes.h"
 
 using namespace std;
 
@@ -21,274 +19,69 @@ namespace options {
     bool showST = false;
 }
 
-/*
- * Utility functions grouped into utils namespace
- */
-
 class AST;
+class Parser;
 
-namespace utils {
-    int toInt(const char c) {
-        if (!isdigit(c)) throw std::invalid_argument("Non-digit character found");
-        return c - '0';
-    }
-    
-    double toDouble(const string s) {
-        double result = stod(s);
-        return result;
-    }
-    
-    bool inArray(const std::string &value, const std::vector<string> &array) {
-        return std::find(array.begin(), array.end(), value) != array.end();
-    }
-    
-    void dumpMap(const map<string, string> &m) {
-        for(auto elem : m) {
-            std::cout << elem.first  << " : " << elem.second << std::endl;
-        }
-    }
-    
-    void combineArrs(vector<AST*> a, vector<AST*> b) {
-        move(b.begin(), b.end(), back_inserter(a));
-    }
-    
-    template <typename K, typename V> class OrderedMap {
-    public:
-        map<K, V> m_map;
-        vector<K> order;
-        V get(K key) const {
-            if (m_map.find(key) == m_map.end()) throw std::invalid_argument("Key not found in ordered map");
-            return m_map.find(key)->second;
-        }
-        V add(K key, V value) {
-            m_map[key] = value;
-            order.insert(order.begin(), key);
-            return value;
-        }
-    };
-}
-
-/*
- * Token types grouped into type namespace
- */
-namespace type {
-    const string eof = "EOF";
-    const string integer = "INTEGER";
-    const string plus = "PLUS";
-    const string minus = "MINUS";
-    const string mul = "MUL";
-    const string float_div = "FLOAT_DIV";
-    const string lparen = "(";
-    const string rparen = ")";
-    const string begin = "BEGIN";
-    const string end = "END";
-    const string assign = "ASSIGN";
-    const string semi = "SEMI";
-    const string dot = "DOT";
-    const string id = "ID";
-    const string program = "PROGRAM";
-    const string var = "VAR";
-    const string int_div = "INTEGER_DIV";
-    const string real = "REAL";
-    const string int_const = "INTEGER_CONST";
-    const string real_const = "REAL_CONST";
-    const string colon = "COLON";
-    const string comma = "COMMA";
-    const string procedure = "PROCEDURE";
-    
-}
-
-/*
- * Enum to determine the type of data in TokenVal
- */
-enum TokenValType {
-    Char,
-    Double,
-    String
-};
-
-/*
- * Struct to hold the value of a token
- */
-
-struct TokenVal {
-    double numVal;
-    char charVal;
-    string strVal;
-    TokenValType type;
-    TokenVal(TokenValType type) {
-        this->type = type;
-    }
-    ~TokenVal() {
-        strVal.clear();
-    }
-    string toString() const {
-        switch(type) {
-            case TokenValType::String: {
-                return strVal;
-                break;
-            }
-            case TokenValType::Double: {
-                return to_string(numVal);
-                break;
-            }
-            case TokenValType::Char: {
-                string res = " ";
-                res[0] = charVal;
-                return res;
-                break;
-            }
-        }
-    }
-};
-
-/*
- * Token class definition
- */
-class Token {
-public:
-    string type;
-    int line;
-    TokenVal value;
-    Token(string type, char value, int line);
-    Token(string type, double value, int line);
-    Token(string type, string value, int line);
-    string toString() const;
-};
-
-Token::Token(string type, char value, int line) : value(TokenVal(TokenValType::Char)){
-    this->type = type;
-    this->value.charVal = value;
-    this->line = line;
-}
-
-Token::Token(string type, double value, int line) : value(TokenVal(TokenValType::Double)){
-    this->type = type;
-    this->value.numVal = value;
-    this->line = line;
-}
-
-Token::Token(string type, string value, int line) : value(TokenVal(TokenValType::String)){
-    this->type = type;
-    this->value.strVal = value;
-    this->line = line;
-}
-
-string Token::toString() const {
-    return "Line " + to_string(line) + " " + "Token({" + type + "}, {" + value.toString() + "})";
-};
-
-std::ostream &operator<< (std::ostream &os, Token const &token) {
-    os << token.toString();
-    return os;
-}
-
-/*
- * Symbol class definition
- */
-
-class Symbol {
-public:
-    string name;
-    Symbol* type;
-    Symbol(string name);
-    Symbol(string name, Symbol* type);
-    virtual string toString() const = 0;
-};
-
-Symbol::Symbol(string name) {
-    this->name = name;
-    type = nullptr;
-}
-
-Symbol::Symbol(string name, Symbol* type) {
-    this->name = name;
-    this->type = type;
-}
-
-std::ostream &operator<< (std::ostream &os, Symbol const &symbol) {
-    os << symbol.toString();
-    return os;
-}
-
-/*
- * Built-in symbol subclass
- */
-
-class BuiltInTypeSymbol: public Symbol {
-public:
-    BuiltInTypeSymbol(string name);
-    string toString() const;
-};
-
-BuiltInTypeSymbol::BuiltInTypeSymbol(string name): Symbol(name) {
-    
-}
-
-string BuiltInTypeSymbol::toString() const {
-    return this->name;
-}
-
-/*
- * Variable symbol subclass
- */
-
-class VarSymbol: public Symbol {
-public:
-    VarSymbol(string name, Symbol* type);
-    string toString() const;
-};
-
-VarSymbol::VarSymbol(string name, Symbol* type) : Symbol(name, type) {
-    
-}
-
-string VarSymbol::toString() const {
-    return "<{" + name + "}:{" + type->toString() + "}>";
-}
 
 /*
  * Symbol table class definition
  */
 
-class SymbolTable {
+class ScopedSymbolTable {
 public:
-    utils::OrderedMap<string, Symbol*> symbols;
-    SymbolTable();
+    utils::OrderedMap<string, Symbol> symbols;
+    ScopedSymbolTable(string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope);
     void define(Symbol* symbol);
-    Symbol* lookup(string name);
+    Symbol* lookup(string name, bool currScope);
     void initBuiltIns();
     string toString() const;
+    ScopedSymbolTable* enclosingScope;
+    int scopeLevel;
+    string name();
+private:
+    string scopeName;
 };
 
-SymbolTable::SymbolTable() {
-    
+string ScopedSymbolTable::name() {
+    return scopeName;
 }
 
-void SymbolTable::define(Symbol* symbol) {
-    if (options::showST) cout << "Define: " + symbol->toString();
+ScopedSymbolTable::ScopedSymbolTable(string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope = nullptr) : scopeLevel(scopeLevel), scopeName(scopeName) {
+    this->enclosingScope = enclosingScope;
+    this->initBuiltIns();
+}
+
+void ScopedSymbolTable::define(Symbol* symbol) {
+    if (options::showST) cout << "Define: " + symbol->toString() << endl;
     symbols.add(symbol->name, symbol);
-    initBuiltIns();
 }
 
-Symbol* SymbolTable::lookup(string name) {
-    if (options::showST) cout << "Lookup: " + name;
-    return symbols.get(name);
+Symbol* ScopedSymbolTable::lookup(string name, bool currScope = false) {
+    if (options::showST) cout << "Lookup: " + name << endl;
+    Symbol* res = symbols.get(name);
+    if (res) return res;
+    if (currScope) return nullptr;
+    else if (enclosingScope) return enclosingScope->lookup(name);
+    return nullptr;
 }
 
-void SymbolTable::initBuiltIns() {
+void ScopedSymbolTable::initBuiltIns() {
     define(new BuiltInTypeSymbol("INTEGER"));
     define(new BuiltInTypeSymbol("REAL"));
 }
 
-string SymbolTable::toString() const {
-    string result = "Symbols: ";
+string ScopedSymbolTable::toString() const {
+    string result = "Symbols in " + scopeName + " scope, level " + to_string(scopeLevel) + '\n';
+    result += "Enclosing scope: ";
+    result += !enclosingScope ? "none" : enclosingScope->scopeName;
+    result += "\n";
     for (string key : symbols.order) {
-        result += this->symbols.get(key)->toString() + ", ";
+        result += key + " : " + this->symbols.get(key)->toString() + ", \n";
     }
     return result;
 }
 
+	    
 /*
  * Lexer class definition
  */
@@ -296,7 +89,7 @@ string SymbolTable::toString() const {
 class Lexer {
 public:
     string input;
-    int pos;
+    unsigned int pos;
     int line;
     char currentChar;
     Lexer(string input);
@@ -311,14 +104,19 @@ public:
     
 private:
     const map<string, Token*> RESERVED_KEYWORDS = {
-        { "BEGIN" , new Token(type::begin, "BEGIN", -1) },
-        { "END", new Token(type::end, "END", -1) },
-        { "PROGRAM", new Token(type::program, "PROGRAM", -1) },
-        { "VAR", new Token(type::var, "VAR", -1) },
-        { "DIV", new Token(type::int_div, "DIV", -1) },
-        { "INTEGER", new Token(type::integer, "INTEGER", -1) },
-        { "REAL", new Token(type::real, "REAL", -1) },
-        { "PROCEDURE", new Token(type::procedure, "PROCEDURE", -1) }
+        { "BEGIN" , new Token(ttype::begin, "BEGIN", -1) },
+        { "END", new Token(ttype::end, "END", -1) },
+        { "PROGRAM", new Token(ttype::program, "PROGRAM", -1) },
+        { "VAR", new Token(ttype::var, "VAR", -1) },
+        { "DIV", new Token(ttype::int_div, "DIV", -1) },
+        { "INTEGER", new Token(ttype::integer, "INTEGER", -1) },
+        { "REAL", new Token(ttype::real, "REAL", -1) },
+        { "PROCEDURE", new Token(ttype::procedure, "PROCEDURE", -1) },
+        { "WHILE", new Token(ttype::twhile, "WHILE", -1)},
+        { "IF", new Token(ttype::tif, "IF", -1)},
+        { "THEN", new Token(ttype::then, "THEN", -1)},
+        { "ELSE", new Token(ttype::telse, "ELSE", -1)},
+        { "DO", new Token(ttype::tdo, "DO", -1)}
     };
 };
 
@@ -330,18 +128,18 @@ Lexer::Lexer(string input) {
 }
 
 void Lexer::error(char ch) {
-    throw std::invalid_argument(string("Invalid character at line " + to_string(line) + ": ") + ch);
+    utils::fatalError(string("Invalid character at line " + to_string(line) + ": ") + "\'" + ch + "\'");
 }
 
 void Lexer::advance() {
     pos++;
-    if (pos > input.length() - 1) currentChar = '\0';
+    if (pos > input.length() - 1) currentChar = 0;
     else currentChar = input[pos];
     if (currentChar == '\n') line++;
 }
 
 void Lexer::skipWhiteSpace() {
-    while (currentChar != '\0' && (currentChar == ' ' || currentChar == '\n')) {
+    while (currentChar != 0 && (currentChar == ' ' || currentChar == '\n' || currentChar == '\t')) {
         advance();
     }
 }
@@ -355,24 +153,24 @@ void Lexer::skipComment() {
 
 Token* Lexer::number() {
     string res = "";
-    while (currentChar != '\0' && isdigit(currentChar)) {
+    while (currentChar != 0 && isdigit(currentChar)) {
         res += currentChar;
         advance();
     }
     if (currentChar == '.') {
         res += currentChar;
         advance();
-        while (currentChar != '\0' && isdigit(currentChar)) {
+        while (currentChar != 0 && isdigit(currentChar)) {
             res += currentChar;
             advance();
         }
-        return new Token(type::real_const, utils::toDouble(res), line);
+        return new Token(ttype::real_const, utils::toDouble(res), line);
     }
-    return new Token(type::int_const, utils::toDouble(res), line);
+    return new Token(ttype::int_const, utils::toDouble(res), line);
 }
 
 Token* Lexer::getNextToken() {
-    while (currentChar != '\0') {
+    while (currentChar != 0) {
         if (currentChar == ' ' || currentChar == '\n') {
             skipWhiteSpace();
             continue;
@@ -391,51 +189,88 @@ Token* Lexer::getNextToken() {
         if (currentChar == ':' && peek() == '=') {
             advance();
             advance();
-            return new Token(type::assign, ":=", line);
+            return new Token(ttype::assign, ":=", line);
         }
         if (currentChar == ':') {
             advance();
-            return new Token(type::colon, ':', line);
+            return new Token(ttype::colon, ':', line);
         }
         if (currentChar == ';') {
             advance();
-            return new Token(type::semi, ';', line);
+            return new Token(ttype::semi, ';', line);
         }
         if (currentChar == '.') {
             advance();
-            return new Token(type::dot, '.', line);
+            return new Token(ttype::dot, '.', line);
         }
         if (currentChar == ',') {
             advance();
-            return new Token(type::comma, ',', line);
+            return new Token(ttype::comma, ',', line);
         }
         if (currentChar == '+') {
             advance();
-            return new Token(type::plus, '+', line);
+            return new Token(ttype::plus, '+', line);
         }
         if (currentChar == '-') {
             advance();
-            return new Token(type::minus, '-', line);
+            return new Token(ttype::minus, '-', line);
         }
         if (currentChar == '*') {
             advance();
-            return new Token(type::mul, '*', line);
+            return new Token(ttype::mul, '*', line);
         }
         if (currentChar == '/') {
             advance();
-            return new Token(type::float_div, '/', line);
+            return new Token(ttype::float_div, '/', line);
         }
         if (currentChar == '(') {
             advance();
-            return new Token(type::lparen, '(', line);
+            return new Token(ttype::lparen, '(', line);
         }
         if (currentChar == ')') {
             advance();
-            return new Token(type::rparen, ')', line);
+            return new Token(ttype::rparen, ')', line);
+        }
+        if (currentChar == '=') {
+            advance();
+            return new Token(ttype::equals, '=', line);
+        }
+        if (currentChar == '!') {
+            if (peek() == '=') {
+                advance();
+                advance();
+                return new Token(ttype::not_equals, "!=", line);
+            }
+            else {
+                advance();
+                return new Token(ttype::bang, '!', line);
+            }
+        }
+        if (currentChar == '<') {
+            if (peek() == '=') {
+                advance();
+                advance();
+                return new Token(ttype::lt_or_equals, "<=", line);
+            }
+            else {
+                advance();
+                return new Token(ttype::less_than, '<', line);
+            }
+        }
+        if (currentChar == '>') {
+            if (peek() == '=') {
+                advance();
+                advance();
+                return new Token(ttype::gt_or_equals, ">=", line);
+            }
+            else {
+                advance();
+                return new Token(ttype::greater_than, '>', line);
+            }
         }
         error(currentChar);
     }
-    return new Token(type::eof, '\0', line);
+    return new Token(ttype::eof, '\0', line);
 }
 
 char Lexer::peek() {
@@ -446,7 +281,7 @@ Token* Lexer::id() {
     //handles identifiers and reserved keywords
     string result = "";
     while(currentChar != '\0' && isalnum(currentChar)) {
-        result += currentChar;
+        result += toupper(currentChar);
         advance();
     }
     map<string, Token*>::const_iterator iter = RESERVED_KEYWORDS.find(result);
@@ -455,461 +290,320 @@ Token* Lexer::id() {
         return iter->second;
     }
     else {
-        return new Token(type::id, result, line);
+        return new Token(ttype::id, result, line);
     }
 }
 
 /****************************************
  Parser
- ***************************************/
-
-/*
- * Define node types
- */
-
-enum NodeType {
-    none,
-    binOp,
-    num,
-    unaryOp,
-    assign,
-    var,
-    compound,
-    program,
-    block,
-    varDecl,
-    varType,
-    procedureDecl
-};
-
-/*
- * Abstract Syntax Tree class definisions
- */
-
-//Pure abstract class AST
-class AST {
-public:
-    virtual NodeType type() const = 0;
-};
-
-//Binary operation node
-class BinOp: public AST {
-public:
-    AST* left;
-    AST* right;
-    Token* op;
-    BinOp(AST* left, Token* op, AST* right);
-    NodeType type() const;
-};
-
-BinOp::BinOp(AST* left, Token* op, AST* right) {
-    this->left = left;
-    this->op = op;
-    this->right = right;
-}
-
-NodeType BinOp::type() const {
-    return NodeType::binOp;
-}
-
-//Number leaf node
-class Num: public AST {
-public:
-    double value;
-    Token* token;
-    Num(Token* token);
-    virtual NodeType type() const;
-};
-
-Num::Num(Token* token) {
-    this->token = token;
-    this->value = token->value.numVal;
-}
-
-NodeType Num::type() const {
-    return NodeType::num;
-}
-
-//Unary operation node
-class UnaryOp: public AST {
-public:
-    Token* op;
-    Token* token;
-    AST* expr;
-    UnaryOp(Token* op, AST* expr);
-    virtual NodeType type() const;
-};
-
-UnaryOp::UnaryOp(Token* op, AST* expr) {
-    this->token = op;
-    this->op = op;
-    this->expr = expr;
-}
-
-NodeType UnaryOp::type() const {
-    return NodeType::unaryOp;
-}
-
-//Compound statement node
-class Compound: public AST {
-public:
-    vector<AST*> children;
-    Compound();
-    virtual NodeType type() const;
-};
-
-Compound::Compound() {
-    children = {};
-}
-
-NodeType Compound::type() const {
-    return NodeType::compound;
-}
-
-//Assignment statement node
-class Assign: public AST {
-public:
-    AST* left;
-    AST* right;
-    Token* token;
-    Token* op;
-    Assign(AST* left, Token* op, AST* right);
-    virtual NodeType type() const;
-};
-
-Assign::Assign(AST* left, Token* op, AST* right) {
-    this->left = left;
-    this->right = right;
-    this->op = op;
-    this->token = op;
-}
-
-NodeType Assign::type() const {
-    return NodeType::assign;
-}
-
-//Variable node
-class Var: public AST {
-public:
-    Token* token;
-    TokenVal value;
-    Var(Token* token);
-    virtual NodeType type() const;
-};
-
-Var::Var(Token* token) : token(token), value(token->value) {
-    
-}
-
-NodeType Var::type() const {
-    return NodeType::var;
-}
-
-//Empty statement node
-class NoOp: public AST {
-public:
-    NodeType type() const;
-};
-
-NodeType NoOp::type() const {
-    return NodeType::none;
-}
-
-//Program node
-class Program: public AST {
-public:
-    string name;
-    AST* block;
-    Program(string name, AST* block);
-    virtual NodeType type() const;
-};
-
-Program::Program(string name, AST* block) {
-    this->name = name;
-    this->block = block;
-}
-
-NodeType Program::type() const {
-    return NodeType::program;
-}
-
-//Block node
-class Block: public AST {
-public:
-    vector<AST*> declarations;
-    AST* compoundStatement;
-    Block(vector<AST*> declarations, AST* compoundStatement);
-    virtual NodeType type() const;
-};
-
-Block::Block(vector<AST*> declarations, AST* compoundStatement) {
-    this->declarations = declarations;
-    this->compoundStatement = compoundStatement;
-}
-
-NodeType Block::type() const {
-    return NodeType::block;
-}
-
-//Var declaration node
-class VarDecl: public AST {
-public:
-    AST* varNode;
-    AST* typeNode;
-    VarDecl(AST* varNode, AST* typeNode);
-    virtual NodeType type() const;
-};
-
-VarDecl::VarDecl(AST* varNode, AST* typeNode) {
-    this->varNode = varNode;
-    this->typeNode = typeNode;
-}
-
-NodeType VarDecl::type() const {
-    return NodeType::varDecl;
-}
-
-//Procedure declaration noe
-class ProcedureDecl: public AST {
-public:
-    string name;
-    AST* blockNode;
-    ProcedureDecl(string name, AST* blockNode);
-    virtual NodeType type() const;
-};
-
-ProcedureDecl::ProcedureDecl(string name, AST* blockNode) {
-    this->name = name;
-    this->blockNode = blockNode;
-}
-
-NodeType ProcedureDecl::type() const {
-    return NodeType::procedureDecl;
-}
-
-//Variable type
-class VarType: public AST {
-public:
-    Token* token;
-    TokenVal value;
-    VarType(Token* token);
-    NodeType type() const;
-};
-
-VarType::VarType(Token* token) : token(token), value(token->value) {
-    
-}
-
-NodeType VarType::type() const {
-    return NodeType::varType;
-}
+***************************************/
 
 class Parser {
 public:
-    Lexer* lexer;
-    Token* currentToken;
     Parser(Lexer* lexer);
-    void error(string details);
+    int line();
+    void error(string errmsg);
     void eat(string tokenType);
-    AST* factor();
-    AST* term();
-    AST* expr();
-    AST* parse();
     AST* program();
+    AST* block();
+    vector<AST*>* declarations();
+    vector<AST*>* formalParameters();
+    vector<AST*>* formalParameterList();
+    vector<AST*>* variableDeclarations();
+    AST* typeSpec();
     AST* compoundStatement();
-    vector<AST*> statementList();
+    vector<AST*>* statementList();
     AST* statement();
     AST* assignmentStatement();
     AST* variable();
     AST* empty();
-    AST* block();
-    vector<AST*> declarations();
-    vector<AST*> variableDeclarations();
-    AST* typeSpec();
+    AST* expr();
+    AST* term();
+    AST* factor();
+    AST* parse();
+    AST* procedureCall();
+    vector<AST*>* actualParameters();
+    AST* ifStatement(bool isElseIf);
+    AST* whileStatement();
+private:
+    Lexer* lexer;
+    Token* currentToken;
 };
 
 Parser::Parser(Lexer* lexer) {
     this->lexer = lexer;
-    currentToken = lexer->getNextToken();
-    if (options::printTokens) cout << *currentToken << endl;
+    this->currentToken = this->lexer->getNextToken();
 }
 
-void Parser::error(string details) {
-    throw std::invalid_argument("Invalid syntax: " + details);
+int Parser::line() {
+    return lexer->line;
+}
+
+void Parser::error(string errmsg) {
+    utils::fatalError("Parse error on line " + to_string(lexer->line) + ": " + errmsg);
 }
 
 void Parser::eat(string tokenType) {
+    if (options::printTokens) {
+        cout << "Consumed token " << *currentToken << endl;
+    }
     if (currentToken->type == tokenType) {
         currentToken = lexer->getNextToken();
-        if (currentToken == nullptr) throw std::logic_error("Current token is null");
-        if (options::printTokens) {
-            cout << *currentToken << endl;
-        }
-    }
-    else this->error("line " + to_string(currentToken->line) + ": " + tokenType + " expected, token of type " + currentToken->type + " with value " + currentToken->value.toString() + " found");
-}
-
-AST* Parser::factor() {
-    /*
-     factor : PLUS factor
-     | MINUS factor
-     | INTEGER_CONST
-     | REAL_CONST
-     | LPAREN expr RPAREN
-     | variable
-     */
-    AST* result = nullptr;
-    Token* token = currentToken;
-    if (token->type == type::plus) {
-        eat(type::plus);
-        result = new UnaryOp(token, factor());
-    }
-    else if (token->type == type::minus) {
-        eat(type::minus);
-        result = new UnaryOp(token, factor());
-    }
-    else if (token->type == type::int_const) {
-        eat(type::int_const);
-        result = new Num(token);
-    }
-    else if (token->type == type::real_const) {
-        eat(type::real_const);
-        result = new Num(token);
-    }
-    else if (token->type == type::lparen) {
-        eat(type::lparen);
-        result = expr();
-        eat(type::rparen);
     }
     else {
-        result = variable();
+        this->error("Token of type " + tokenType + " expected, " + currentToken->type + " with value \"" + currentToken->value.toString() + "\" found");
     }
-    return result;
-}
-
-AST* Parser::term() {
-    //term : factor ((MUL | INTEGER_DIV | FLOAT_DIV) factor)*
-    AST* result = factor();
-    vector<string> ops = {type::mul, type::float_div, type::int_div};
-    Token* token;
-    while(utils::inArray(currentToken->type, ops)) {
-        token = currentToken;
-        if (token->type == type::mul) {
-            eat(type::mul);
-        }
-        else if (token->type == type::int_div) {
-            eat(type::int_div);
-        }
-        else if (token->type == type::float_div) {
-            eat(type::float_div);
-        }
-        result = new BinOp(result, token, factor());
-    }
-    return result;
-}
-
-AST* Parser::expr() {
-    //expr : term ((PLUS | MINUS) term)*
-    AST* result = term();
-    vector<string> ops = {type::plus, type::minus};
-    Token* token;
-    while(utils::inArray(currentToken->type, ops)) {
-        token = currentToken;
-        if (token->type == type::plus) {
-            eat(type::plus);
-        }
-        else if (token->type == type::minus) {
-            eat(type::minus);
-        }
-        result = new BinOp(result, token, term());
-    }
-    return result;
-}
-
-AST* Parser::parse() {
-    AST* node = program();
-    if (currentToken->type != type::eof) {
-        error("EOF expected, " + currentToken->type + " found");
-    }
-    return node;
 }
 
 AST* Parser::program() {
-    //program : PROGRAM variable SEMI block DOT
-    eat(type::program);
-    AST* node = variable();
-    if (node->type() != NodeType::var) error("Variable expected before block");
-    Var varNode = dynamic_cast<Var&>(*node);
-    if (varNode.value.type != TokenValType::String) error("Program token did not return string for program name");
-    string programName = varNode.value.strVal;
-    eat(type::semi);
-    AST* blockNode = block();
-    AST* programNode = new Program(programName, blockNode);
-    eat(type::dot);
+    this->eat(ttype::program);
+    Var* varNode = dynamic_cast<Var*>(this->variable());
+    string progName = varNode->value.strVal;
+    this->eat(ttype::semi);
+    int line = this->line();
+    Block* blockNode = dynamic_cast<Block*>(this->block());
+    Program* programNode = new Program(progName, blockNode);
+    this->eat(ttype::dot);
+    programNode->line = line;
     return programNode;
 }
 
+AST* Parser::block() {
+    int line = this->line();
+    vector<AST*>* declarationNodes = this->declarations();
+    AST* compoundStatementNode = this->compoundStatement();
+    Block* block = new Block(*declarationNodes, compoundStatementNode);
+    block->line = line;
+    return block;
+}
+
+vector<AST*>* Parser::declarations() {
+    vector<AST*>* declarations = new vector<AST*>();
+    while (true) {
+        if (currentToken->type == ttype::var) {
+            this->eat(ttype::var);
+            while (currentToken->type == ttype::id) {
+                vector<AST*>* varDecl = this->variableDeclarations();
+                utils::combineArrs(*declarations, *varDecl);
+                this->eat(ttype::semi);
+            }
+        }
+        else if (currentToken->type == ttype::procedure) {
+            this->eat(ttype::procedure);
+            string procName = currentToken->value.strVal;
+            this->eat(ttype::id);
+            vector<AST*>* params;
+            if (currentToken->type == ttype::lparen) {
+                this->eat(ttype::lparen);
+                params = this->formalParameterList();
+                this->eat(ttype::rparen);
+            }
+            else {
+                params = new vector<AST*>();
+            }
+            this->eat(ttype::semi);
+            AST* blockNode = this->block();
+            AST* procDecl = new ProcedureDecl(procName, params, blockNode);
+            procDecl->line = this->line();
+            declarations->push_back(procDecl);
+            this->eat(ttype::semi);
+        }
+        else break;
+    }
+    return declarations;
+}
+
+vector<AST*>* Parser::formalParameters() {
+    vector<AST*>* paramNodes = new vector<AST*>();
+    vector<Token*> paramTokens = { currentToken };
+    this->eat(ttype::id);
+    while (currentToken->type == ttype::comma) {
+        this->eat(ttype::comma);
+        paramTokens.push_back(currentToken);
+        this->eat(ttype::id);
+    }
+    this->eat(ttype::colon);
+    AST* typeNode = this->typeSpec();
+    for (Token* paramToken : paramTokens) {
+        paramNodes->push_back(new Param(new Var(paramToken), typeNode));
+    }
+    return paramNodes;
+}
+
+vector<AST*>* Parser::formalParameterList() {
+    if (currentToken->type != ttype::id) {
+        return new vector<AST*>();
+    }
+    vector<AST*>* paramNodes = this->formalParameters();
+    vector<AST*>* formalParams;
+    while (currentToken->type == ttype::semi) {
+        this->eat(ttype::semi);
+        formalParams = this->formalParameters();
+        utils::combineArrs(*paramNodes, *formalParams);
+    }
+    return paramNodes;
+}
+
+vector<AST*>* Parser::variableDeclarations() {
+    vector<AST*> varNodes = { new Var(currentToken) };
+    this->eat(ttype::id);
+    Var* var;
+    while (currentToken->type == ttype::comma) {
+        this->eat(ttype::comma);
+        var = new Var(currentToken);
+        var->line = this->line();
+        varNodes.push_back(var);
+        this->eat(ttype::id);
+    }
+    this->eat(ttype::colon);
+    AST* typeNode = this->typeSpec();
+    vector<AST*>* varDeclarations = new vector<AST*>();
+    VarDecl* varDecl;
+    for (AST* varNode : varNodes) {
+        varDecl = new VarDecl(varNode, typeNode);
+        varDecl->line = this->line();
+        varDeclarations->push_back(varDecl);
+    }
+    return varDeclarations;
+}
+
+AST* Parser::typeSpec() {
+    Token* token = currentToken;
+    if (currentToken->type == ttype::integer) {
+        this->eat(ttype::integer);
+    }
+    else {
+        this->eat(ttype::real);
+    }
+    Type* type = new Type(token);
+    type->line = this->line();
+    return type;
+}
+
+AST* Parser::ifStatement(bool isElseIf = false) {
+    int line = this->line();
+    this->eat(ttype::tif);
+    this->eat(ttype::lparen);
+    AST* conditionExpr = expr();
+    this->eat(ttype::rparen);
+    // There's no then
+    if (!isElseIf) {
+        this->eat(ttype::then);
+    }
+    AST* blockNode = block();
+    AST* elseNode = nullptr;
+    // If there's no semicolon, there's an else branch.
+    if (currentToken->type != ttype::semi) {
+        this->eat(ttype::telse);
+        // This means it's an else-if
+        if (currentToken->type == ttype::tif) {
+            elseNode = this->ifStatement(true);
+        }
+        // This means it's not.
+        else if (currentToken->type == ttype::begin) {
+            elseNode = this->block();
+        }
+        else error("Semicolon expected after if-statement block on line " + to_string(this->line()));
+    }
+    IfStatement* ifStatement = new IfStatement(conditionExpr, blockNode, elseNode);
+    ifStatement->line = line;
+    return ifStatement;
+}
+
+AST* Parser::whileStatement() {
+    int line = this->line();
+    this->eat(ttype::twhile);
+    this->eat(ttype::lparen);
+    AST* conditionExpr = expr();
+    this->eat(ttype::rparen);
+    this->eat(ttype::tdo);
+    AST* blockNode = block();
+    if (currentToken->type != ttype::semi) {
+        error("Semicolon expected after while-statement block on line " + to_string(this->line()));
+    }
+    WhileStatement* whileStatement = new WhileStatement(conditionExpr, blockNode);
+    whileStatement->line = line;
+    return whileStatement;
+}
+
 AST* Parser::compoundStatement() {
-    //compound_statement: BEGIN statement_list END
-    eat(type::begin);
-    vector<AST*> nodes = statementList();
-    eat(type::end);
+    this->eat(ttype::begin);
+    vector<AST*>* nodes = this->statementList();
+    this->eat(ttype::end);
+
     Compound* root = new Compound();
-    for (AST* node : nodes) {
+    root->line = this->line();
+    for (AST* node : *nodes) {
         root->children.push_back(node);
     }
+
     return root;
 }
 
-vector<AST*> Parser::statementList() {
-    /*
-     statement_list : statement
-     | statement SEMI statement_list
-     */
-    AST* node = statement();
-    vector<AST*> results = {node};
-    while(currentToken->type == type::semi) {
-        eat(type::semi);
-        results.push_back(statement());
-    }
-    if (currentToken->type == type::id) {
-        error("Unexpected ID found");
+vector<AST*>* Parser::statementList() {
+    AST* node = this->statement();
+    vector<AST*>* results = new vector<AST*>();
+    results->push_back(node);
+    while (currentToken->type == ttype::semi) {
+        this->eat(ttype::semi);
+        results->push_back(this->statement());
     }
     return results;
 }
 
 AST* Parser::statement() {
-    /*
-     statement : compound_statement
-     | assignment_statement
-     | empty
-     */
-    AST* node = nullptr;
-    if (currentToken->type == type::begin) {
-        node = compoundStatement();
+    if (currentToken->type == ttype::begin) {
+        return this->compoundStatement();
     }
-    else if (currentToken->type == type::id) {
-        node = assignmentStatement();
+    else if (currentToken->type == ttype::tif) {
+        return this->ifStatement();
     }
-    else {
-        node = empty();
+    else if (currentToken->type == ttype::twhile) {
+        return this->whileStatement();
     }
-    return node;
+    else if (currentToken->type == ttype::id) {
+        // Okay, so this is either an assignment or a function call
+        if (lexer->currentChar == '(') {
+            return this->procedureCall();
+        }
+        else {
+            return this->assignmentStatement();
+        }
+    }
+    return this->empty();
+}
+
+AST* Parser::procedureCall() {
+    int line = this->line();
+    string procName = currentToken->value.strVal;
+    vector<AST*>* actualParams = new vector<AST*>();
+    eat(ttype::id);
+    eat(ttype::lparen);
+    while (currentToken->type != ttype::rparen){
+        actualParams->push_back(this->expr());
+        if (currentToken->type == ttype::comma) {
+            eat(ttype::comma);
+            continue;
+        }
+    }
+    eat(ttype::rparen);
+    ProcedureCall* procedureCall = new ProcedureCall(procName, actualParams);
+    procedureCall->line = line;
+    return procedureCall;
 }
 
 AST* Parser::assignmentStatement() {
-    //assignment_statement : variable ASSIGN expr
-    AST* left = variable();
+    AST* left = this->variable();
     Token* token = currentToken;
-    eat(type::assign);
-    AST* right = expr();
+    this->eat(ttype::assign);
+    AST* right = this->expr();
     return new Assign(left, token, right);
 }
 
 AST* Parser::variable() {
-    //variable : ID
     AST* node = new Var(currentToken);
-    eat(type::id);
+    node->line = this->line();
+    this->eat(ttype::id);
     return node;
 }
 
@@ -917,71 +611,332 @@ AST* Parser::empty() {
     return new NoOp();
 }
 
-AST* Parser::block() {
-    //block : declarations compound_statement
-    vector<AST*> declarationNodes = declarations();
-    AST* compoundStatement = this->compoundStatement();
-    return new Block(declarationNodes, compoundStatement);
-}
-
-vector<AST*> Parser::declarations() {
-    /*
-     declarations : VAR (variable_declaration SEMI)+
-     | empty
-     */
-    vector<AST*> declarations = {};
-    if (currentToken->type == type::var) {
-        eat(type::var);
-        while(currentToken->type == type::id) {
-            vector<AST*> varDecl = variableDeclarations();
-            utils::combineArrs(declarations, varDecl);
-            eat(type::semi);
+AST* Parser::expr() {
+    AST* node = this->term();
+    unordered_set<string> types = {ttype::plus, ttype::minus};
+    while (types.find(currentToken->type) != types.end()) {
+        Token* token = currentToken;
+        if (token->type == ttype::plus) {
+            this->eat(ttype::plus);
         }
+        else if (token->type == ttype::minus) {
+            this->eat(ttype::minus);
+        }
+        node = new BinOp(node, token, this->term());
+        node->line = this->line();
     }
-    while (currentToken->type == type::procedure) {
-        eat(type::procedure);
-        string procName = currentToken->value.strVal;
-        eat(type::id);
-        eat(type::semi);
-        AST* blockNode = block();
-        AST* procedureDecl = new ProcedureDecl(procName, blockNode);
-        declarations.push_back(procedureDecl);
-        eat(type::semi);
-    }
-    return declarations;
+    return node;
 }
 
-vector<AST*> Parser::variableDeclarations() {
-    //variable_declaration : ID (COMMA ID)* COLON type_spec
-    vector<AST*> varNodes = {new Var(currentToken)};
-    eat(type::id);
-    while(currentToken->type == type::comma) {
-        eat(type::comma);
-        varNodes.push_back(new Var(currentToken));
-        eat(type::id);
+AST* Parser::term() {
+    AST* node = this->factor();
+    unordered_set<string> types = {ttype::mul, ttype::int_div, ttype::float_div, ttype::equals, ttype::not_equals};
+    while (types.find(currentToken->type) != types.end()) {
+        Token* token = currentToken;
+        if (token->type == ttype::mul) {
+            this->eat(ttype::mul);
+        }
+        else if (token->type == ttype::int_div) {
+            this->eat(ttype::int_div);
+        }
+        else if (token->type == ttype::float_div) {
+            this->eat(ttype::float_div);
+        }
+        else if (token->type == ttype::equals) {
+            this->eat(ttype::equals);
+        }
+        else if (token->type == ttype::not_equals) {
+            this->eat(ttype::not_equals);
+        }
+        else if (token->type == ttype::greater_than) {
+            this->eat(ttype::greater_than);
+        }
+        node = new BinOp(node, token, this->factor());
+        node->line = this->line();
     }
-    eat(type::colon);
-    AST* typeNode = typeSpec();
-    vector<AST*> varDecls = {};
-    for (AST* varNode : varNodes) {
-        varDecls.push_back(new VarDecl(varNode, typeNode));
-    }
-    return varDecls;
+    return node;
 }
 
-AST* Parser::typeSpec() {
-    /*
-     type_spec : INTEGER
-     | REAL
-     */
+AST* Parser::factor() {
     Token* token = currentToken;
-    if (token->type == type::integer) {
-        eat(type::integer);
+    if (token->type == ttype::plus) {
+        this->eat(ttype::plus);
+        return new UnaryOp(token, this->factor());
+    }
+    else if (token->type == ttype::minus) {
+        this->eat(ttype::minus);
+        return new UnaryOp(token, this->factor());
+    }
+    else if (token->type == ttype::int_const) {
+        this->eat(ttype::int_const);
+        return new Num(token);
+    }
+    else if (token->type == ttype::real_const) {
+        this->eat(ttype::real_const);
+        return new Num(token);
+    }
+    else if (token->type == ttype::lparen) {
+        AST* node;
+        this->eat(ttype::lparen);
+        node = this->expr();
+        this->eat(ttype::rparen);
+        return node;
     }
     else {
-        eat(type::real);
+        return this->variable();
     }
-    return new VarType(token);
+}
+
+AST* Parser::parse() {
+    AST* node = this->program();
+    if (currentToken->type != ttype::eof) {
+        this->error("parsing terminated before end of file");
+    }
+    return node;
+}
+
+class SemanticAnalyzer {
+public:
+    void visit(AST* node);
+    SemanticAnalyzer();
+private:
+    ScopedSymbolTable* currentScope;
+    map<ProcedureSymbol*, AST*> procedureTable;
+};
+
+SemanticAnalyzer::SemanticAnalyzer() : currentScope(nullptr) {
+}
+
+void SemanticAnalyzer::visit(AST* node) {
+    if (node == nullptr) utils::fatalError(string("Parse tree is null"));
+    switch(node->type()) {
+        case NodeType::block: {
+            Block* blockNode = dynamic_cast<Block*>(node);
+            for (AST* declaration : blockNode->declarations) {
+                this->visit(declaration);
+            }
+            this->visit(blockNode->compoundStatement);
+            break;
+        }
+        case NodeType::program: {
+            if (options::showST) {
+                cout << "ENTER scope: global" << endl;
+            }
+            ScopedSymbolTable* globalScope = new ScopedSymbolTable("global", 1, currentScope);
+            currentScope = globalScope;
+            Program* progNode = dynamic_cast<Program*>(node);
+            this->visit(progNode->block);
+            if (options::showST) {
+                cout << globalScope->toString() << endl;
+                cout << "LEAVE scope: global" << endl;
+            }
+            progNode->table = currentScope;
+            currentScope = currentScope->enclosingScope;
+            break;
+        }
+        case NodeType::compound: {
+            Compound* compNode = dynamic_cast<Compound*>(node);
+            for (AST* child : compNode->children) {
+                this->visit(child);
+            }
+            break;
+        }
+        case NodeType::none: {
+            break;
+        }
+        case NodeType::binOp: {
+            BinOp* binOpNode = dynamic_cast<BinOp*>(node);
+            this->visit(binOpNode->left);
+            this->visit(binOpNode->right);
+            break;
+        }
+        case NodeType::varDecl: {
+            VarDecl* varDeclNode = dynamic_cast<VarDecl*>(node);
+            Var* varNode = dynamic_cast<Var*>(varDeclNode->varNode);
+            Type* typeNode = dynamic_cast<Type*>(varDeclNode->typeNode);
+            string typeName = typeNode->value.strVal;
+            Symbol* typeSymbol;
+            if (!(typeSymbol = currentScope->lookup(typeName))) {
+                utils::fatalError("Semantic error: no type symbol found for type name " + typeName + " on line " + to_string(varNode->token->line));
+            }
+            string varName = varNode->value.strVal;
+            if (currentScope->lookup(varName)) {
+                utils::fatalError("Semantic error: duplicate identifier " + varName + " found on line " + to_string(varNode->token->line));
+            }
+            currentScope->define(new VarSymbol(varName, typeSymbol));
+            break;
+        }
+        case NodeType::assign: {
+            Assign* assignNode = dynamic_cast<Assign*>(node);
+            this->visit(assignNode->left);
+            this->visit(assignNode->right);
+            break;
+        }
+        case NodeType::var: {
+            Var* varNode = dynamic_cast<Var*>(node);
+            if (!currentScope->lookup(varNode->value.strVal)) {
+                utils::fatalError("Semantic error: symbol not found for variable " + varNode->value.strVal + " on line " + to_string(varNode->token->line));
+            }
+            break;
+        }
+        case NodeType::procedureDecl: {
+            ProcedureDecl* procDecNode = dynamic_cast<ProcedureDecl*>(node);
+            string procName = procDecNode->procName;
+            ProcedureSymbol* procSymbol = new ProcedureSymbol(procName);
+            currentScope->define(procSymbol);
+            procedureTable[procSymbol] = procDecNode;
+            if (options::showST) {
+                cout << "ENTER scope: " << procName << endl;
+            }
+            ScopedSymbolTable* procedureScope = new ScopedSymbolTable(procName, currentScope->scopeLevel + 1, currentScope);
+            currentScope = procedureScope;
+            
+            for (AST* param : *(procDecNode->params)) {
+                Param* paramNode = dynamic_cast<Param*>(param);
+                Type* paramType = dynamic_cast<Type*>(paramNode->typeNode);
+                Symbol* paramTypeSymbol = currentScope->lookup(paramType->value.strVal);
+                Var* paramVarNode = dynamic_cast<Var*>(paramNode->varNode);
+                VarSymbol* varSymbol = new VarSymbol(paramVarNode->value.strVal, paramTypeSymbol);
+                currentScope->define(varSymbol);
+                procSymbol->params->push_back(varSymbol);
+            }
+            procDecNode->table = currentScope;
+            currentScope = currentScope->enclosingScope;
+            if (options::showST) {
+                cout << procedureScope->toString() << endl;
+                cout << "LEAVE scope: " << procName << endl;
+            }
+            break;
+        }
+        case NodeType::procedureCall: {
+            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
+            string procName = procCallNode->procName;
+            Symbol* result;
+            if (!(result = currentScope->lookup(procName))) {
+                utils::fatalError("Semantic error: no procedure found with name " + procName);
+            }
+            ProcedureSymbol* procSymbol = dynamic_cast<ProcedureSymbol*>(result);
+            map<ProcedureSymbol*, AST*>::iterator iter;
+            if ((iter = procedureTable.find(procSymbol)) == procedureTable.end()) {
+                utils::fatalError("Semantic error: procedure declaration node could not be found in program tree");
+            }
+            procCallNode->procDeclNode = iter->second;
+            break;
+        }
+        case NodeType::ifStatement: {
+            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+            this->visit(ifStatementNode->conditionNode);
+            this->visit(ifStatementNode->blockNode);
+            if (ifStatementNode->elseBranch) {
+                this->visit(ifStatementNode->elseBranch);
+            }
+            break;
+        }
+        case NodeType::whileStatement: {
+            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+            this->visit(whileStatementNode->conditionNode);
+            this->visit(whileStatementNode->blockNode);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+/****************************************
+ Call Stack
+ ***************************************/
+
+class CallStack {
+public:
+    CallStack();
+    void pushFrame(ScopedSymbolTable* symbolTable);
+    void popFrame();
+    void assign(string key, string value, int line);
+    string lookup(string key, int line);
+private:
+    struct StackFrame {
+        unordered_map<string, string> valTable;
+        StackFrame* parent;
+        ScopedSymbolTable* symbolTable;
+        StackFrame(ScopedSymbolTable* symbolTable, StackFrame* parent = nullptr) : parent(parent), symbolTable(symbolTable) {}
+        void dump() {
+            cout << "______________________________" << endl;
+            cout << "Frame: " << symbolTable->name() << endl;
+            utils::dumpMap(valTable);
+            cout << "______________________________" << endl;
+        }
+    };
+    string foundVal;
+    StackFrame* findFrame(string key);
+    StackFrame* currentFrame;
+};
+
+CallStack::CallStack() {
+    currentFrame = nullptr;
+}
+
+CallStack::StackFrame* CallStack::findFrame(string key) {
+    utils::toUpper(key);
+    cout << "lookup for kval " << key << endl;
+    StackFrame* frame = currentFrame;
+    unordered_map<string, string>::iterator it;
+    while(frame) {
+        frame->dump();
+        if (frame->symbolTable->name() == "global") {
+            cout << "should be " << frame->valTable[key] << endl;
+        }
+        it = currentFrame->valTable.find(key);
+        if (it == currentFrame->valTable.end()) {
+            frame = frame->parent;
+        }
+        else {
+            foundVal = it->second;
+            cout << "found value " << foundVal << endl;
+            return frame;
+        }
+    }
+    return nullptr;
+}
+
+string CallStack::lookup(string key, int line = -1) {
+    cout << "stack lookup for " << key << endl;
+    if (findFrame(key)) {
+        return foundVal;
+    }
+    utils::fatalError("Could not find value for variable reference '" + key + "' on line " + to_string(line));
+    return "";
+}
+
+void CallStack::assign(string key, string value, int line = -1) {
+    utils::toUpper(key);
+    cout << "assign: " << key << ", " << value << endl;
+    StackFrame* frame;
+    if (!currentFrame) {
+        utils::fatalError("Stack error: no initial frame pushed to call stack");
+    }
+    if (!currentFrame->symbolTable->lookup(key)) {
+        utils::fatalError("Failed assignment to undeclared variable " + value + " on line " + to_string(line));
+    }
+    if (!(frame = this->findFrame(key))) {
+        frame = currentFrame;
+    }
+    frame->valTable.insert(make_pair(key, value));
+    cout << "assigned: " << this->lookup(key) << endl;
+}
+
+void CallStack::pushFrame(ScopedSymbolTable* symbolTable) {
+    cout << "new stack pushed" << endl;
+    StackFrame* newFrame = new StackFrame(symbolTable, currentFrame);
+    currentFrame = newFrame;
+}
+
+void CallStack::popFrame() {
+    cout << "stack pop" << endl;
+    StackFrame* oldFrame = currentFrame;
+    currentFrame = currentFrame->parent;
+    delete oldFrame;
+    if (!currentFrame) cout << "popped base frame" << endl;
 }
 
 /****************************************
@@ -998,34 +953,49 @@ public:
     Interpreter(Parser* parser);
     double visit(AST* node);
     double interpret();
-    map<string, string> GLOBAL_SCOPE;
+private:
+    CallStack stack;
 };
 
 Interpreter::Interpreter(Parser* parser) {
     this->parser = parser;
-    Interpreter::GLOBAL_SCOPE = {};
 }
 
 double Interpreter::visit(AST* node) {
-    if (node == nullptr) throw std::logic_error(string("Parse tree is null"));
+    if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
         case NodeType::binOp: {
             BinOp binNode = dynamic_cast<BinOp&>(*node);
             string opType = binNode.op->type;
-            if (opType == type::plus) {
+            if (opType == ttype::plus) {
                 return visit(binNode.left) + visit(binNode.right);
             }
-            else if (opType == type::minus) {
+            else if (opType == ttype::minus) {
                 return visit(binNode.left) - visit(binNode.right);
             }
-            else if (opType == type::mul) {
+            else if (opType == ttype::mul) {
                 return visit(binNode.left) * visit(binNode.right);
             }
-            else if (opType == type::int_div) {
+            else if (opType == ttype::int_div) {
                 return (int(visit(binNode.left)) / int(visit(binNode.right)));
             }
-            else if (opType == type::float_div) {
+            else if (opType == ttype::float_div) {
                 return visit(binNode.left) / visit(binNode.right);
+            }
+            else if (opType == ttype::equals) {
+                double left = visit(binNode.left);
+                double right = visit(binNode.right);
+                cout << "left: " << left << " right: " << right << endl;
+                return left == right;
+            }
+            else if (opType == ttype::not_equals) {
+                double left = visit(binNode.left);
+                double right = visit(binNode.right);
+                cout << "left: " << left << " right: " << right << endl;
+                return left != right;
+            }
+            else {
+                utils::fatalError(opType + " on line " + to_string(binNode.line) + " is not a known binary operation");
             }
             break;
         }
@@ -1037,11 +1007,14 @@ double Interpreter::visit(AST* node) {
         case NodeType::unaryOp: {
             UnaryOp unaryNode = dynamic_cast<UnaryOp&>(*node);
             string opType = unaryNode.op->type;
-            if (opType == type::plus) {
+            if (opType == ttype::plus) {
                 return visit(unaryNode.expr);
             }
-            else if (opType == type::minus) {
+            else if (opType == ttype::minus) {
                 return -1 * visit(unaryNode.expr);
+            }
+            else {
+                utils::fatalError(opType + " on line " + to_string(unaryNode.line) + " is not a known unary operation");
             }
             break;
         }
@@ -1059,27 +1032,18 @@ double Interpreter::visit(AST* node) {
             Assign assignNode = dynamic_cast<Assign&>(*node);
             Var varNode = dynamic_cast<Var&>(*assignNode.left);
             string varName = varNode.value.strVal;
-            GLOBAL_SCOPE[varName] = to_string(visit(assignNode.right));
-            if (options::dumpVars) {
-                cout << "Dumping global variables..." << endl;
-                utils::dumpMap(GLOBAL_SCOPE);
-            }
+            stack.assign(varName, to_string(visit(assignNode.right)), assignNode.line);
             break;
         }
         case NodeType::var: {
             Var varNode = dynamic_cast<Var&>(*node);
-            map<string, string>::iterator iter = GLOBAL_SCOPE.find(varNode.value.strVal);
-            string varValue = iter->second;
-            if (iter == GLOBAL_SCOPE.end()) {
-                throw std::invalid_argument(string("Variable ") + varNode.value.strVal + string(" does not exist"));
-            }
-            else {
-                return utils::toDouble(varValue);
-            }
+            string varValue = stack.lookup(varNode.value.strVal, varNode.line);
+            return utils::toDouble(varValue);
             break;
         }
         case NodeType::program: {
             Program progNode = dynamic_cast<Program&>(*node);
+            stack.pushFrame(progNode.table);
             visit(progNode.block);
             break;
         }
@@ -1089,6 +1053,7 @@ double Interpreter::visit(AST* node) {
                 visit(decl);
             }
             visit(block.compoundStatement);
+            stack.popFrame();
             break;
         }
         case NodeType::varDecl: {
@@ -1100,14 +1065,55 @@ double Interpreter::visit(AST* node) {
         case NodeType::procedureDecl: {
             break;
         }
+        case NodeType::procedureCall: {
+            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
+            ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
+            stack.pushFrame(procDeclNode->table);
+            if (procCallNode->paramVals->size() != procDeclNode->params->size()) {
+                utils::fatalError("Wrong number of parameters in call to " + procDeclNode->procName + " on line " + to_string(procCallNode->line));
+            }
+            Param* paramNode;
+            Var* varNode;
+            for (int i = 0;i<procCallNode->paramVals->size();i++) {
+                paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
+                varNode = dynamic_cast<Var*>(paramNode->varNode);
+                stack.assign(varNode->value.strVal, to_string(visit(procCallNode->paramVals->at(i))));
+            }
+            visit(procDeclNode->blockNode);
+            break;
+        }
+        case NodeType::ifStatement: {
+            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+            // Well isn't this code convenient...
+            double condition = visit(ifStatementNode->conditionNode);
+            cout << "If Condition result: " << condition << endl;
+            if (condition) {
+                visit(ifStatementNode->blockNode);
+            }
+            else if (ifStatementNode->elseBranch) {
+                visit(ifStatementNode->elseBranch);
+            }
+            break;
+        }
+        case NodeType::whileStatement: {
+            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+            double condition;
+            while ((condition = visit(whileStatementNode->conditionNode))) {
+                cout << "While condition result: " << condition << endl;
+                visit(whileStatementNode->blockNode);
+            }
+            break;
+        }
         default:
-            throw std::logic_error(string("Syntax tree node of type-index ") + to_string(node->type()) + string(" cannot be visited"));
+            utils::fatalError(string("Syntax tree node of type-index ") + to_string(node->type()) + string(" cannot be visited"));
     }
     return NAN;
 }
 
 double Interpreter::interpret() {
     AST* tree = parser->parse();
+    SemanticAnalyzer analyzer;
+    analyzer.visit(tree);
     return visit(tree);
 }
 
@@ -1146,7 +1152,7 @@ int main(int argc, char *argv[]) {
     options::showST = input.cmdOptionExists("-sst") || input.cmdOptionExists("--show-symbol-table");
     
     if (!fileName.empty()) {
-        cout << "file name: " << fileName << endl;
+        cout << "File: " << fileName << endl;
         ifstream file(fileName);
         stringstream buffer;
         buffer << file.rdbuf();
@@ -1156,24 +1162,5 @@ int main(int argc, char *argv[]) {
         Interpreter interpreter = Interpreter(&parser);
         cout << interpreter.interpret() << endl;
     }
-    /*
-     string input;
-     Lexer* lexer;
-     Parser* parser;
-     Interpreter* interpreter;
-     while(true) {
-     cout << ">> ";
-     getline(cin, input);
-     if (input.empty()) continue;
-     lexer = new Lexer(input);
-     parser = new Parser(lexer);
-     interpreter = new Interpreter(parser);
-     cout << interpreter->interpret() << endl;
-     
-     delete lexer;
-     delete parser;
-     delete interpreter;
-     }
-     */
     return 0;
 }

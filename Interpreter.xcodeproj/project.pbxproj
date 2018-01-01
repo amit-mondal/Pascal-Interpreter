@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2820A49D1FE760BE0019F17A /* Token.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2820A49C1FE760BE0019F17A /* Token.cpp */; };
+		282489381FECE704000AE37B /* Symbol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 282489371FECE704000AE37B /* Symbol.cpp */; };
+		2824893B1FECE99F000AE37B /* ASTNodes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2824893A1FECE99F000AE37B /* ASTNodes.cpp */; };
+		2824893D1FEDC5E0000AE37B /* test2.pas in Sources */ = {isa = PBXBuildFile; fileRef = 2824893C1FEDC5E0000AE37B /* test2.pas */; };
 		28E9AA4E1E845F6D00AAF138 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28E9AA4D1E845F6D00AAF138 /* main.cpp */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +27,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2820A49C1FE760BE0019F17A /* Token.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Token.cpp; path = /Users/amit/Documents/Interpreter/Interpreter/Token.cpp; sourceTree = "<absolute>"; };
+		2820A49E1FE760BF0019F17A /* Token.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = Token.h; path = /Users/amit/Documents/Interpreter/Interpreter/Token.h; sourceTree = "<absolute>"; };
+		2820A49F1FE760C20019F17A /* utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = utils.h; path = /Users/amit/Documents/Interpreter/Interpreter/utils.h; sourceTree = "<absolute>"; };
+		282489361FECE704000AE37B /* Symbol.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Symbol.h; sourceTree = "<group>"; };
+		282489371FECE704000AE37B /* Symbol.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Symbol.cpp; sourceTree = "<group>"; };
+		282489391FECE99F000AE37B /* ASTNodes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ASTNodes.h; sourceTree = "<group>"; };
+		2824893A1FECE99F000AE37B /* ASTNodes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ASTNodes.cpp; sourceTree = "<group>"; };
+		2824893C1FEDC5E0000AE37B /* test2.pas */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.pascal; path = test2.pas; sourceTree = "<group>"; };
 		28E9AA4A1E845F6C00AAF138 /* Interpreter */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Interpreter; sourceTree = BUILT_PRODUCTS_DIR; };
 		28E9AA4D1E845F6D00AAF138 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -57,7 +69,15 @@
 		28E9AA4C1E845F6C00AAF138 /* Interpreter */ = {
 			isa = PBXGroup;
 			children = (
+				2820A49F1FE760C20019F17A /* utils.h */,
+				2820A49E1FE760BF0019F17A /* Token.h */,
+				2824893A1FECE99F000AE37B /* ASTNodes.cpp */,
+				282489391FECE99F000AE37B /* ASTNodes.h */,
+				282489371FECE704000AE37B /* Symbol.cpp */,
+				282489361FECE704000AE37B /* Symbol.h */,
+				2820A49C1FE760BE0019F17A /* Token.cpp */,
 				28E9AA4D1E845F6D00AAF138 /* main.cpp */,
+				2824893C1FEDC5E0000AE37B /* test2.pas */,
 			);
 			path = Interpreter;
 			sourceTree = "<group>";
@@ -120,6 +140,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				28E9AA4E1E845F6D00AAF138 /* main.cpp in Sources */,
+				2820A49D1FE760BE0019F17A /* Token.cpp in Sources */,
+				2824893B1FECE99F000AE37B /* ASTNodes.cpp in Sources */,
+				282489381FECE704000AE37B /* Symbol.cpp in Sources */,
+				2824893D1FEDC5E0000AE37B /* test2.pas in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,6 +270,7 @@
 				28E9AA531E845F6D00AAF138 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
