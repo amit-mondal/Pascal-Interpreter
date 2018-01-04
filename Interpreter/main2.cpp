@@ -358,11 +358,11 @@ void Parser::eat(string tokenType) {
 
 AST* Parser::program() {
     this->eat(ttype::program);
-    Var* varNode = dynamic_cast<Var*>(this->variable());
+    Var* varNode = reinterpret_cast<Var*>(this->variable());
     string progName = varNode->value.strVal;
     this->eat(ttype::semi);
     int line = this->line();
-    Block* blockNode = dynamic_cast<Block*>(this->block());
+    Block* blockNode = reinterpret_cast<Block*>(this->block());
     Program* programNode = new Program(progName, blockNode);
     this->eat(ttype::dot);
     programNode->line = line;
@@ -712,7 +712,7 @@ void SemanticAnalyzer::visit(AST* node) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
         case NodeType::block: {
-            Block* blockNode = dynamic_cast<Block*>(node);
+            Block* blockNode = reinterpret_cast<Block*>(node);
             for (AST* declaration : blockNode->declarations) {
                 this->visit(declaration);
             }
@@ -725,7 +725,7 @@ void SemanticAnalyzer::visit(AST* node) {
             }
             ScopedSymbolTable* globalScope = new ScopedSymbolTable("global", 1, currentScope);
             currentScope = globalScope;
-            Program* progNode = dynamic_cast<Program*>(node);
+            Program* progNode = reinterpret_cast<Program*>(node);
             this->visit(progNode->block);
             if (options::showST) {
                 cout << globalScope->toString() << endl;
@@ -736,7 +736,7 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::compound: {
-            Compound* compNode = dynamic_cast<Compound*>(node);
+            Compound* compNode = reinterpret_cast<Compound*>(node);
             for (AST* child : compNode->children) {
                 this->visit(child);
             }
@@ -746,15 +746,15 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::binOp: {
-            BinOp* binOpNode = dynamic_cast<BinOp*>(node);
+            BinOp* binOpNode = reinterpret_cast<BinOp*>(node);
             this->visit(binOpNode->left);
             this->visit(binOpNode->right);
             break;
         }
         case NodeType::varDecl: {
-            VarDecl* varDeclNode = dynamic_cast<VarDecl*>(node);
-            Var* varNode = dynamic_cast<Var*>(varDeclNode->varNode);
-            Type* typeNode = dynamic_cast<Type*>(varDeclNode->typeNode);
+            VarDecl* varDeclNode = reinterpret_cast<VarDecl*>(node);
+            Var* varNode = reinterpret_cast<Var*>(varDeclNode->varNode);
+            Type* typeNode = reinterpret_cast<Type*>(varDeclNode->typeNode);
             string typeName = typeNode->value.strVal;
             Symbol* typeSymbol;
             if (!(typeSymbol = currentScope->lookup(typeName))) {
@@ -768,20 +768,20 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::assign: {
-            Assign* assignNode = dynamic_cast<Assign*>(node);
+            Assign* assignNode = reinterpret_cast<Assign*>(node);
             this->visit(assignNode->left);
             this->visit(assignNode->right);
             break;
         }
         case NodeType::var: {
-            Var* varNode = dynamic_cast<Var*>(node);
+            Var* varNode = reinterpret_cast<Var*>(node);
             if (!currentScope->lookup(varNode->value.strVal)) {
                 utils::fatalError("Semantic error: symbol not found for variable " + varNode->value.strVal + " on line " + to_string(varNode->token->line));
             }
             break;
         }
         case NodeType::procedureDecl: {
-            ProcedureDecl* procDecNode = dynamic_cast<ProcedureDecl*>(node);
+            ProcedureDecl* procDecNode = reinterpret_cast<ProcedureDecl*>(node);
             string procName = procDecNode->procName;
             ProcedureSymbol* procSymbol = new ProcedureSymbol(procName);
             currentScope->define(procSymbol);
@@ -793,10 +793,10 @@ void SemanticAnalyzer::visit(AST* node) {
             currentScope = procedureScope;
             
             for (AST* param : *(procDecNode->params)) {
-                Param* paramNode = dynamic_cast<Param*>(param);
-                Type* paramType = dynamic_cast<Type*>(paramNode->typeNode);
+                Param* paramNode = reinterpret_cast<Param*>(param);
+                Type* paramType = reinterpret_cast<Type*>(paramNode->typeNode);
                 Symbol* paramTypeSymbol = currentScope->lookup(paramType->value.strVal);
-                Var* paramVarNode = dynamic_cast<Var*>(paramNode->varNode);
+                Var* paramVarNode = reinterpret_cast<Var*>(paramNode->varNode);
                 VarSymbol* varSymbol = new VarSymbol(paramVarNode->value.strVal, paramTypeSymbol);
                 currentScope->define(varSymbol);
                 procSymbol->params->push_back(varSymbol);
@@ -811,13 +811,13 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::procedureCall: {
-            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
+            ProcedureCall* procCallNode = reinterpret_cast<ProcedureCall*>(node);
             string procName = procCallNode->procName;
             Symbol* result;
             if (!(result = currentScope->lookup(procName))) {
                 utils::fatalError("Semantic error: no procedure found with name " + procName);
             }
-            ProcedureSymbol* procSymbol = dynamic_cast<ProcedureSymbol*>(result);
+            ProcedureSymbol* procSymbol = reinterpret_cast<ProcedureSymbol*>(result);
             map<ProcedureSymbol*, AST*>::iterator iter;
             if ((iter = procedureTable.find(procSymbol)) == procedureTable.end()) {
                 utils::fatalError("Semantic error: procedure declaration node could not be found in program tree");
@@ -826,7 +826,7 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::ifStatement: {
-            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+            IfStatement* ifStatementNode = reinterpret_cast<IfStatement*>(node);
             this->visit(ifStatementNode->conditionNode);
             this->visit(ifStatementNode->blockNode);
             if (ifStatementNode->elseBranch) {
@@ -835,7 +835,7 @@ void SemanticAnalyzer::visit(AST* node) {
             break;
         }
         case NodeType::whileStatement: {
-            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+            WhileStatement* whileStatementNode = reinterpret_cast<WhileStatement*>(node);
             this->visit(whileStatementNode->conditionNode);
             this->visit(whileStatementNode->blockNode);
             break;
@@ -986,7 +986,7 @@ double Interpreter::visit(AST* node) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
         case NodeType::binOp: {
-            BinOp binNode = dynamic_cast<BinOp&>(*node);
+            BinOp binNode = reinterpret_cast<BinOp&>(*node);
             string opType = binNode.op->type;
             if (opType == ttype::plus) {
                 return visit(binNode.left) + visit(binNode.right);
@@ -1021,12 +1021,12 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::num: {
-            Num num = dynamic_cast<Num&>(*node);
+            Num num = reinterpret_cast<Num&>(*node);
             return num.value;
             break;
         }
         case NodeType::unaryOp: {
-            UnaryOp unaryNode = dynamic_cast<UnaryOp&>(*node);
+            UnaryOp unaryNode = reinterpret_cast<UnaryOp&>(*node);
             string opType = unaryNode.op->type;
             if (opType == ttype::plus) {
                 return visit(unaryNode.expr);
@@ -1040,7 +1040,7 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::compound: {
-            Compound compoundNode = dynamic_cast<Compound&>(*node);
+            Compound compoundNode = reinterpret_cast<Compound&>(*node);
             for (AST* child : compoundNode.children) {
                 visit(child);
             }
@@ -1050,26 +1050,26 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::assign: {
-            Assign assignNode = dynamic_cast<Assign&>(*node);
-            Var varNode = dynamic_cast<Var&>(*assignNode.left);
+            Assign assignNode = reinterpret_cast<Assign&>(*node);
+            Var varNode = reinterpret_cast<Var&>(*assignNode.left);
             string varName = varNode.value.strVal;
             stack.assign(varName, to_string(visit(assignNode.right)), assignNode.line);
             break;
         }
         case NodeType::var: {
-            Var varNode = dynamic_cast<Var&>(*node);
+            Var varNode = reinterpret_cast<Var&>(*node);
             string varValue = stack.lookup(varNode.value.strVal, varNode.line);
             return utils::toDouble(varValue);
             break;
         }
         case NodeType::program: {
-            Program progNode = dynamic_cast<Program&>(*node);
+            Program progNode = reinterpret_cast<Program&>(*node);
             stack.pushFrame(progNode.table);
             visit(progNode.block);
             break;
         }
         case NodeType::block: {
-            Block block = dynamic_cast<Block&>(*node);
+            Block block = reinterpret_cast<Block&>(*node);
             for (AST* decl : block.declarations) {
                 visit(decl);
             }
@@ -1086,8 +1086,8 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::procedureCall: {
-            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
-            ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
+            ProcedureCall* procCallNode = reinterpret_cast<ProcedureCall*>(node);
+            ProcedureDecl* procDeclNode = reinterpret_cast<ProcedureDecl*>(procCallNode->procDeclNode);
             // Check for matching number of formal and actual params.
             if (procCallNode->paramVals->size() != procDeclNode->params->size()) {
                 utils::fatalError("Wrong number of parameters in call to " + procDeclNode->procName + " on line " + to_string(procCallNode->line));
@@ -1099,8 +1099,8 @@ double Interpreter::visit(AST* node) {
             string finalParamVals[numParams];
             string paramNames[numParams];
             for (unsigned int i = 0;i<numParams;i++) {
-                paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
-                varNode = dynamic_cast<Var*>(paramNode->varNode);
+                paramNode = reinterpret_cast<Param*>(procDeclNode->params->at(i));
+                varNode = reinterpret_cast<Var*>(paramNode->varNode);
                 finalParamVals[i] = to_string(visit(procCallNode->paramVals->at(i)));
                 cout << "param val: " << finalParamVals[i] << endl;
                 paramNames[i] = varNode->value.strVal;
@@ -1114,7 +1114,7 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::ifStatement: {
-            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+            IfStatement* ifStatementNode = reinterpret_cast<IfStatement*>(node);
             // Well isn't this code convenient...
             double condition = visit(ifStatementNode->conditionNode);
             cout << "If Condition result: " << condition << endl;
@@ -1127,7 +1127,7 @@ double Interpreter::visit(AST* node) {
             break;
         }
         case NodeType::whileStatement: {
-            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+            WhileStatement* whileStatementNode = reinterpret_cast<WhileStatement*>(node);
             double condition;
             while ((condition = visit(whileStatementNode->conditionNode))) {
                 cout << "While condition result: " << condition << endl;

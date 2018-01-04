@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = -g -Wall -Wextra -Wno-unused-parameter -std=c++11
 
-headers = utils.h Token.h Symbol.h ASTNodes.h
+headers = utils.h Token.h Symbol.h ASTNodes.h constants.h
 sources = main.cpp Token.cpp Symbol.cpp ASTNodes.cpp
 objectfiles = main.o Token.o Symbol.o ASTNodes.o
 

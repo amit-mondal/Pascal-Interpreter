@@ -2,22 +2,27 @@ program Main;
 var x, y :  real;
 
 procedure Alpha(a, b :  integer);
-var y :  integer;
+var s :  integer;
 begin
-   x := a + x + y + b;
+   x := a + y + b;
+   if (x) then begin
+y := x + 3;
+    end;
 end;
 
-procedure Beta(a, b :  integer);
-var y :  integer;
+procedure Recurse(a: integer);
 begin
-x := a + x + y + b;
+if (a) then begin
+    Recurse(a - 1);
+    Alpha(a, x);
 end;
+end;
+
 
 begin { Main }
 
-x := 3;
 x := 7;
-y := 4;
-Alpha(x, y);
+y := x + 3;
+Recurse(x);
 
 end.  { Main }
