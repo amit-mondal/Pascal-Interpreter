@@ -133,15 +133,6 @@ public:
     virtual NodeType type() const;
 };
 
-//Var declaration node
-class VarDecl: public AST {
-public:
-    AST* varNode;
-    AST* typeNode;
-    VarDecl(AST* varNode, AST* typeNode);
-    virtual NodeType type() const;
-};
-
 class Type: public AST {
 public:
     Token* token;
@@ -150,11 +141,20 @@ public:
     virtual NodeType type() const;
 };
 
+//Var declaration node
+class VarDecl: public AST {
+public:
+    Var* varNode;
+    Type* typeNode;
+    VarDecl(Var* varNode, Type* typeNode);
+    virtual NodeType type() const;
+};
+
 class Param: public AST {
 public:
-    AST* varNode;
-    AST* typeNode;
-    Param(AST* varNode, AST* typeNode);
+    Var* varNode;
+    Type* typeNode;
+    Param(Var* varNode, Type* typeNode);
     virtual NodeType type() const;
 };
 

@@ -33,7 +33,7 @@ public:
     vector<Param*>* formalParameters();
     vector<Param*>* formalParameterList();
     vector<AST*>* variableDeclarations();
-    AST* typeSpec();
+    Type* typeSpec();
     AST* compoundStatement();
     vector<AST*>* statementList();
     AST* statement();
@@ -170,7 +170,7 @@ vector<Param*>* Parser::formalParameters() {
         this->eat(ttype::id);
     }
     this->eat(ttype::colon);
-    AST* typeNode = this->typeSpec();
+    Type* typeNode = this->typeSpec();
     for (Token* paramToken : paramTokens) {
         paramNodes->push_back(new Param(new Var(paramToken), typeNode));
     }
@@ -203,10 +203,12 @@ vector<AST*>* Parser::variableDeclarations() {
         this->eat(ttype::id);
     }
     this->eat(ttype::colon);
-    AST* typeNode = this->typeSpec();
+    Type* typeNode = this->typeSpec();
     vector<AST*>* varDeclarations = new vector<AST*>();
     VarDecl* varDecl;
-    for (AST* varNode : varNodes) {
+    Var* varNode;
+    for (AST* _varNode : varNodes) {
+	varNode = dynamic_cast<Var*>(_varNode);
         varDecl = new VarDecl(varNode, typeNode);
         varDecl->line = this->line();
         varDeclarations->push_back(varDecl);
@@ -214,7 +216,7 @@ vector<AST*>* Parser::variableDeclarations() {
     return varDeclarations;
 }
 
-AST* Parser::typeSpec() {
+Type* Parser::typeSpec() {
     Token* token = currentToken;
     if (this->validTypes.find(currentToken->value.strVal) == validTypes.end()) {
         this->error(currentToken->value.strVal + " is not a valid type");
@@ -445,17 +447,23 @@ AST* Parser::parse() {
 
 class SemanticAnalyzer {
 public:
-    void visit(AST* node);
     SemanticAnalyzer();
+    enum AssignmentState {
+			  NONE,
+			  LHS,
+			  RHS
+    };
+    void visit(AST* node, AssignmentState aState = NONE);    
 private:
     ScopedSymbolTable* currentScope;
     map<ProcedureSymbol*, AST*> procedureTable;
+    Symbol* lhsType, *rhsType;
 };
 
 SemanticAnalyzer::SemanticAnalyzer() : currentScope(nullptr) {
 }
 
-void SemanticAnalyzer::visit(AST* node) {
+void SemanticAnalyzer::visit(AST* node, AssignmentState aState) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
     case NodeType::block: {
@@ -500,8 +508,8 @@ void SemanticAnalyzer::visit(AST* node) {
     }
     case NodeType::varDecl: {
 	VarDecl* varDeclNode = dynamic_cast<VarDecl*>(node);
-	Var* varNode = dynamic_cast<Var*>(varDeclNode->varNode);
-	Type* typeNode = dynamic_cast<Type*>(varDeclNode->typeNode);
+	Var* varNode = varDeclNode->varNode;
+	Type* typeNode = varDeclNode->typeNode;
 	string typeName = typeNode->value.strVal;
 	Symbol* typeSymbol;
 	if (!(typeSymbol = currentScope->lookup(typeName))) {
@@ -522,8 +530,9 @@ void SemanticAnalyzer::visit(AST* node) {
     }
     case NodeType::assign: {
 	Assign* assignNode = dynamic_cast<Assign*>(node);
-	this->visit(assignNode->left);
-	this->visit(assignNode->right);
+	// Let recursive calls know to collect types for type-checking.	
+	this->visit(assignNode->left, LHS);
+	this->visit(assignNode->right, RHS);
 	break;
     }
     case NodeType::var: {
@@ -547,9 +556,9 @@ void SemanticAnalyzer::visit(AST* node) {
             
 	for (AST* param : *(procDecNode->params)) {
 	    Param* paramNode = dynamic_cast<Param*>(param);
-	    Type* paramType = dynamic_cast<Type*>(paramNode->typeNode);
+	    Type* paramType = paramNode->typeNode;
 	    Symbol* paramTypeSymbol = currentScope->lookup(paramType->value.strVal);
-	    Var* paramVarNode = dynamic_cast<Var*>(paramNode->varNode);
+	    Var* paramVarNode = paramNode->varNode;
 	    VarSymbol* varSymbol = new VarSymbol(paramVarNode->value.strVal, paramTypeSymbol);
 	    currentScope->define(varSymbol);
 	    procSymbol->params->push_back(varSymbol);
@@ -723,11 +732,11 @@ DataVal Interpreter::visit(AST* node) {
 	break;
     }
     case NodeType::assign: {
-	Assign assignNode = dynamic_cast<Assign&>(*node);
-	Var varNode = dynamic_cast<Var&>(*assignNode.left);
-	string varName = varNode.value.strVal;
-	DataVal rvalue = visit(assignNode.right);
-	stack.assign(varName, rvalue, assignNode.line);
+	Assign* assignNode = dynamic_cast<Assign*>(node);
+	Var* varNode = dynamic_cast<Var*>(assignNode->left);
+	string varName = varNode->value.strVal;
+	DataVal rvalue = visit(assignNode->right);
+	stack.assign(varName, rvalue, assignNode->line);
 	break;
     }
     case NodeType::var: {
@@ -773,7 +782,7 @@ DataVal Interpreter::visit(AST* node) {
 	string paramNames[numParams];
 	for (unsigned int i = 0;i<numParams;i++) {
 	    paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
-	    varNode = dynamic_cast<Var*>(paramNode->varNode);
+	    varNode = paramNode->varNode;
 	    finalParamVals[i] = visit(procCallNode->paramVals->at(i));
 	    paramNames[i] = varNode->value.strVal;
 	}

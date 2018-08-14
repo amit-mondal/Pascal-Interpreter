@@ -85,7 +85,7 @@ NodeType Block::type() const {
     return NodeType::block;
 }
 
-VarDecl::VarDecl(AST* varNode, AST* typeNode) {
+VarDecl::VarDecl(Var* varNode, Type* typeNode) {
     this->varNode = varNode;
     this->typeNode = typeNode;
 }
@@ -127,7 +127,7 @@ NodeType RecordDecl::type() const {
 }
 
 
-Param::Param(AST* varNode, AST* typeNode) : varNode(varNode), typeNode(typeNode) {
+Param::Param(Var* varNode, Type* typeNode) : varNode(varNode), typeNode(typeNode) {
 }
 
 NodeType Param::type() const {
