@@ -1,4 +1,4 @@
-#include "ASTNodes.h"
+ #include "ASTNodes.h"
 
 using namespace std;
 
@@ -12,13 +12,18 @@ NodeType BinOp::type() const {
     return NodeType::binOp;
 }
 
-Num::Num(Token* token) {
-    this->token = token;
-    this->value = token->value.numVal;
+Num::Num(Token* token) : value(DataVal(token->value.numVal)), token(token) {
 }
 
 NodeType Num::type() const {
     return NodeType::num;
+}
+
+StringLiteral::StringLiteral(Token* token) : value(DataVal(token->value.strVal)), token(token) {
+}
+
+NodeType StringLiteral::type() const {
+    return NodeType::stringLiteral;
 }
 
 UnaryOp::UnaryOp(Token* op, AST* expr) {
@@ -96,13 +101,31 @@ NodeType Type::type() const {
     return NodeType::varType;
 }
 
-ProcedureDecl::ProcedureDecl(string procName, vector<AST*>* params, AST* blockNode) : procName(procName), blockNode(blockNode), params(params) {
+ProcedureDecl::ProcedureDecl(string procName, vector<Param*>* params, AST* blockNode) : procName(procName), blockNode(blockNode), params(params) {
     table = nullptr;
 }
 
 NodeType ProcedureDecl::type() const {
     return NodeType::procedureDecl;
 }
+
+RecordDecl::RecordDecl(string recordName, vector<AST*>* memberDecls) : recordName(recordName) {
+    Var* varNode;
+    VarDecl* v;
+    for (size_t i = 0;i < memberDecls->size(); i++) {
+	v = dynamic_cast<VarDecl*>(memberDecls->at(i));
+	varNode = dynamic_cast<Var*>(v->varNode);
+	this->memberIndex[varNode->value.strVal] =
+	    make_pair(dynamic_cast<Type*>(v->typeNode), i);
+    }
+    // We won't need this anymore.
+    delete memberDecls;
+}
+
+NodeType RecordDecl::type() const {
+    return NodeType::recordDecl;
+}
+
 
 Param::Param(AST* varNode, AST* typeNode) : varNode(varNode), typeNode(typeNode) {
 }

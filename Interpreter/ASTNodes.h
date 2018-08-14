@@ -1,6 +1,11 @@
+#ifndef ASTNODES_H
+#define ASTNODES_H
+
+
 #include "Token.h"
 #include "Symbol.h"
 #include "utils.h"
+#include "DataVal.h"
 
 /*
  * Define node types
@@ -10,6 +15,7 @@ enum NodeType {
     none,
     binOp,
     num,
+    stringLiteral,
     unaryOp,
     assign,
     var,
@@ -22,7 +28,8 @@ enum NodeType {
     param,
     procedureCall,
     ifStatement,
-    whileStatement
+    whileStatement,
+    recordDecl
 };
 
 class ScopedSymbolTable;
@@ -48,9 +55,17 @@ public:
 //Number leaf node
 class Num: public AST {
 public:
-    double value;
+    DataVal value;
     Token* token;
     Num(Token* token);
+    virtual NodeType type() const;
+};
+
+class StringLiteral: public AST {
+public:
+    DataVal value;
+    Token* token;
+    StringLiteral(Token* token);
     virtual NodeType type() const;
 };
 
@@ -135,21 +150,29 @@ public:
     virtual NodeType type() const;
 };
 
-class ProcedureDecl: public AST {
-public:
-    std::string procName;
-    AST* blockNode;
-    std::vector<AST*>* params;
-    ScopedSymbolTable* table;
-    ProcedureDecl(std::string procName, std::vector<AST*>* params, AST* blockNode);
-    virtual NodeType type() const;
-};
-
 class Param: public AST {
 public:
     AST* varNode;
     AST* typeNode;
     Param(AST* varNode, AST* typeNode);
+    virtual NodeType type() const;
+};
+
+class ProcedureDecl: public AST {
+public:
+    std::string procName;
+    AST* blockNode;
+    std::vector<Param*>* params;
+    ScopedSymbolTable* table;
+    ProcedureDecl(std::string procName, std::vector<Param*>* params, AST* blockNode);
+    virtual NodeType type() const;
+};
+
+class RecordDecl: public AST {
+ public:
+    std::string recordName;
+    std::unordered_map<std::string, std::pair<Type*, int> > memberIndex;
+    RecordDecl(std::string recordName, std::vector<AST*>* memberDecls);
     virtual NodeType type() const;
 };
 
@@ -178,3 +201,5 @@ public:
     AST* blockNode;
     virtual NodeType type() const;
 };
+
+#endif

@@ -28,6 +28,13 @@ string BuiltInTypeSymbol::toString() const {
 }
 
 
+UserDefinedTypeSymbol::UserDefinedTypeSymbol(string name): Symbol(name) {
+    
+}
+
+string UserDefinedTypeSymbol::toString() const {
+    return "UserDefinedTypeSymbol<name=" + this->name + ">";
+}
 
 
 

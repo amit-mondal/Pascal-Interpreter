@@ -28,6 +28,12 @@ public:
     virtual std::string toString() const;
 };
 
+class UserDefinedTypeSymbol: public Symbol {
+ public:
+    UserDefinedTypeSymbol(std::string name);
+    virtual std::string toString() const;
+};
+
 
 /*
  * Variable symbol subclass

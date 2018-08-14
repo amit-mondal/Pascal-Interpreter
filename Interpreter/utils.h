@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <cctype>
+#include "options.h"
 
 class AST;
 
@@ -35,15 +36,10 @@ namespace utils {
     inline bool inArray(const std::string &value, const std::vector<std::string> &array) {
         return std::find(array.begin(), array.end(), value) != array.end();
     }
-    
-    inline void dumpMap(const std::unordered_map<std::string, std::string> &m) {
-        for(auto elem : m) {
-            std::cout << elem.first  << " : " << elem.second << std::endl;
-        }
-    }
-    
-    inline void combineArrs(std::vector<AST*>& a, std::vector<AST*>& b) {
-        move(b.begin(), b.end(), back_inserter(a));
+
+    template <typename T>
+    inline void combineArrs(std::vector<T*>* a, std::vector<T*>* b) {
+        move(b->begin(), b->end(), back_inserter(*a));
     }
     
     template <typename K, typename V> class OrderedMap {

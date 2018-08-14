@@ -43,7 +43,10 @@ namespace ttype {
     const std::string lt_or_equals = "LT_OR_EQUALS";
     const std::string gt_or_equals = "GT_OR_EQUALS";
     const std::string bang = "BANG";
-    
+    const std::string string_literal = "STRING_LITERAL";
+    const std::string string = "STRING";
+    const std::string record = "RECORD";
+    const std::string type = "TYPE";
 }
 
 /*

@@ -2,298 +2,20 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
-#include "utils.h"
 #include "constants.h"
 #include "Token.h"
+#include "Lexer.h"
 #include "Symbol.h"
 #include "ASTNodes.h"
+#include "DataVal.h"
+#include "CallStack.h"
+#include "options.h"
 
 using namespace std;
 
-/*
- * Runtime options
- */
-
-namespace options {
-    bool printTokens = false;
-    bool dumpVars = false;
-    bool showST = false;
-}
-
 class AST;
-class Parser;
+class Parser;	   
 
-
-/*
- * Symbol table class definition
- */
-
-class ScopedSymbolTable {
-public:
-    utils::OrderedMap<string, Symbol> symbols;
-    ScopedSymbolTable(string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope);
-    void define(Symbol* symbol);
-    Symbol* lookup(string name, bool currScope);
-    void initBuiltIns();
-    string toString() const;
-    ScopedSymbolTable* enclosingScope;
-    int scopeLevel;
-    string name();
-private:
-    string scopeName;
-};
-
-string ScopedSymbolTable::name() {
-    return scopeName;
-}
-
-ScopedSymbolTable::ScopedSymbolTable(string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope = nullptr) : scopeLevel(scopeLevel), scopeName(scopeName) {
-    this->enclosingScope = enclosingScope;
-    this->initBuiltIns();
-}
-
-void ScopedSymbolTable::define(Symbol* symbol) {
-    if (options::showST) cout << "Define: " + symbol->toString() << endl;
-    symbols.add(symbol->name, symbol);
-}
-
-Symbol* ScopedSymbolTable::lookup(string name, bool currScope = false) {
-    if (options::showST) cout << "Lookup: " + name << endl;
-    Symbol* res = symbols.get(name);
-    if (res) return res;
-    if (currScope) return nullptr;
-    else if (enclosingScope) return enclosingScope->lookup(name);
-    return nullptr;
-}
-
-void ScopedSymbolTable::initBuiltIns() {
-    define(new BuiltInTypeSymbol("INTEGER"));
-    define(new BuiltInTypeSymbol("REAL"));
-}
-
-string ScopedSymbolTable::toString() const {
-    string result = "Symbols in " + scopeName + " scope, level " + to_string(scopeLevel) + '\n';
-    result += "Enclosing scope: ";
-    result += !enclosingScope ? "none" : enclosingScope->scopeName;
-    result += "\n";
-    for (string key : symbols.order) {
-        result += key + " : " + this->symbols.get(key)->toString() + ", \n";
-    }
-    return result;
-}
-
-	    
-/*
- * Lexer class definition
- */
-
-class Lexer {
-public:
-    string input;
-    unsigned int pos;
-    int line;
-    char currentChar;
-    Lexer(string input);
-    void error(char ch);
-    void advance();
-    void skipWhiteSpace();
-    void skipComment();
-    Token* number();
-    Token* getNextToken();
-    char peek();
-    Token* id();
-    
-private:
-    const map<string, Token*> RESERVED_KEYWORDS = {
-        { "BEGIN" , new Token(ttype::begin, "BEGIN", -1) },
-        { "END", new Token(ttype::end, "END", -1) },
-        { "PROGRAM", new Token(ttype::program, "PROGRAM", -1) },
-        { "VAR", new Token(ttype::var, "VAR", -1) },
-        { "DIV", new Token(ttype::int_div, "DIV", -1) },
-        { "INTEGER", new Token(ttype::integer, "INTEGER", -1) },
-        { "REAL", new Token(ttype::real, "REAL", -1) },
-        { "PROCEDURE", new Token(ttype::procedure, "PROCEDURE", -1) },
-        { "WHILE", new Token(ttype::twhile, "WHILE", -1)},
-        { "IF", new Token(ttype::tif, "IF", -1)},
-        { "THEN", new Token(ttype::then, "THEN", -1)},
-        { "ELSE", new Token(ttype::telse, "ELSE", -1)},
-        { "DO", new Token(ttype::tdo, "DO", -1)}
-    };
-};
-
-Lexer::Lexer(string input) {
-    this->input = input;
-    pos = 0;
-    line = 1;
-    currentChar = input[pos];
-}
-
-void Lexer::error(char ch) {
-    utils::fatalError(string("Invalid character at line " + to_string(line) + ": ") + "\'" + ch + "\'");
-}
-
-void Lexer::advance() {
-    pos++;
-    if (pos > input.length() - 1) currentChar = 0;
-    else currentChar = input[pos];
-    if (currentChar == '\n') line++;
-}
-
-void Lexer::skipWhiteSpace() {
-    while (currentChar != 0 && (currentChar == ' ' || currentChar == '\n' || currentChar == '\t')) {
-        advance();
-    }
-}
-
-void Lexer::skipComment() {
-    while (currentChar != '}') {
-        advance();
-    }
-    advance();
-}
-
-Token* Lexer::number() {
-    string res = "";
-    while (currentChar != 0 && isdigit(currentChar)) {
-        res += currentChar;
-        advance();
-    }
-    if (currentChar == '.') {
-        res += currentChar;
-        advance();
-        while (currentChar != 0 && isdigit(currentChar)) {
-            res += currentChar;
-            advance();
-        }
-        return new Token(ttype::real_const, utils::toDouble(res), line);
-    }
-    return new Token(ttype::int_const, utils::toDouble(res), line);
-}
-
-Token* Lexer::getNextToken() {
-    while (currentChar != 0) {
-        if (currentChar == ' ' || currentChar == '\n') {
-            skipWhiteSpace();
-            continue;
-        }
-        if (currentChar == '{') {
-            advance();
-            skipComment();
-            continue;
-        }
-        if (isdigit(currentChar)) {
-            return number();
-        }
-        if (isalpha(currentChar)) {
-            return id();
-        }
-        if (currentChar == ':' && peek() == '=') {
-            advance();
-            advance();
-            return new Token(ttype::assign, ":=", line);
-        }
-        if (currentChar == ':') {
-            advance();
-            return new Token(ttype::colon, ':', line);
-        }
-        if (currentChar == ';') {
-            advance();
-            return new Token(ttype::semi, ';', line);
-        }
-        if (currentChar == '.') {
-            advance();
-            return new Token(ttype::dot, '.', line);
-        }
-        if (currentChar == ',') {
-            advance();
-            return new Token(ttype::comma, ',', line);
-        }
-        if (currentChar == '+') {
-            advance();
-            return new Token(ttype::plus, '+', line);
-        }
-        if (currentChar == '-') {
-            advance();
-            return new Token(ttype::minus, '-', line);
-        }
-        if (currentChar == '*') {
-            advance();
-            return new Token(ttype::mul, '*', line);
-        }
-        if (currentChar == '/') {
-            advance();
-            return new Token(ttype::float_div, '/', line);
-        }
-        if (currentChar == '(') {
-            advance();
-            return new Token(ttype::lparen, '(', line);
-        }
-        if (currentChar == ')') {
-            advance();
-            return new Token(ttype::rparen, ')', line);
-        }
-        if (currentChar == '=') {
-            advance();
-            return new Token(ttype::equals, '=', line);
-        }
-        if (currentChar == '!') {
-            if (peek() == '=') {
-                advance();
-                advance();
-                return new Token(ttype::not_equals, "!=", line);
-            }
-            else {
-                advance();
-                return new Token(ttype::bang, '!', line);
-            }
-        }
-        if (currentChar == '<') {
-            if (peek() == '=') {
-                advance();
-                advance();
-                return new Token(ttype::lt_or_equals, "<=", line);
-            }
-            else {
-                advance();
-                return new Token(ttype::less_than, '<', line);
-            }
-        }
-        if (currentChar == '>') {
-            if (peek() == '=') {
-                advance();
-                advance();
-                return new Token(ttype::gt_or_equals, ">=", line);
-            }
-            else {
-                advance();
-                return new Token(ttype::greater_than, '>', line);
-            }
-        }
-        error(currentChar);
-    }
-    return new Token(ttype::eof, '\0', line);
-}
-
-char Lexer::peek() {
-    return (pos + 1) > input.length() - 1 ? '\0' : input[pos + 1];
-}
-
-Token* Lexer::id() {
-    //handles identifiers and reserved keywords
-    string result = "";
-    while(currentChar != '\0' && isalnum(currentChar)) {
-        result += toupper(currentChar);
-        advance();
-    }
-    map<string, Token*>::const_iterator iter = RESERVED_KEYWORDS.find(result);
-    if (iter != RESERVED_KEYWORDS.end()) {
-        iter->second->line = line;
-        return iter->second;
-    }
-    else {
-        return new Token(ttype::id, result, line);
-    }
-}
 
 /****************************************
  Parser
@@ -308,8 +30,8 @@ public:
     AST* program();
     AST* block();
     vector<AST*>* declarations();
-    vector<AST*>* formalParameters();
-    vector<AST*>* formalParameterList();
+    vector<Param*>* formalParameters();
+    vector<Param*>* formalParameterList();
     vector<AST*>* variableDeclarations();
     AST* typeSpec();
     AST* compoundStatement();
@@ -324,9 +46,10 @@ public:
     AST* parse();
     AST* procedureCall();
     vector<AST*>* actualParameters();
-    AST* ifStatement(bool isElseIf);
+    AST* ifStatement(bool isElseIf = false);
     AST* whileStatement();
 private:
+    unordered_set<string> validTypes = {ttype::integer, ttype::real, ttype::string};
     Lexer* lexer;
     Token* currentToken;
 };
@@ -385,7 +108,7 @@ vector<AST*>* Parser::declarations() {
             this->eat(ttype::var);
             while (currentToken->type == ttype::id) {
                 vector<AST*>* varDecl = this->variableDeclarations();
-                utils::combineArrs(*declarations, *varDecl);
+                utils::combineArrs<AST>(declarations, varDecl);
                 this->eat(ttype::semi);
             }
         }
@@ -393,14 +116,14 @@ vector<AST*>* Parser::declarations() {
             this->eat(ttype::procedure);
             string procName = currentToken->value.strVal;
             this->eat(ttype::id);
-            vector<AST*>* params;
+            vector<Param*>* params;
             if (currentToken->type == ttype::lparen) {
                 this->eat(ttype::lparen);
                 params = this->formalParameterList();
                 this->eat(ttype::rparen);
             }
             else {
-                params = new vector<AST*>();
+                params = new vector<Param*>();
             }
             this->eat(ttype::semi);
             AST* blockNode = this->block();
@@ -409,13 +132,36 @@ vector<AST*>* Parser::declarations() {
             declarations->push_back(procDecl);
             this->eat(ttype::semi);
         }
+	else if (currentToken->type == ttype::type) {
+	    this->eat(ttype::type);
+	    string recordName = currentToken->value.strVal;
+	    this->eat(ttype::id);
+	    this->eat(ttype::equals);
+	    this->eat(ttype::record);	    
+	    vector<AST*>* varDecls = new vector<AST*>();
+	    while (currentToken->type == ttype::id) {
+		vector<AST*>* varDecl = this->variableDeclarations();
+		utils::combineArrs<AST>(varDecls, varDecl);
+		this->eat(ttype::semi);
+	    }
+	    RecordDecl* recordDecl = new RecordDecl(recordName, varDecls);
+	    if (validTypes.find(recordName) != validTypes.end()) {
+		utils::fatalError("Illegal redeclaration of record " + recordName + " on line " + to_string(this->line()));
+	    }
+	    // Register the newly declared type as a valid type.
+	    validTypes.insert(recordName);
+	    recordDecl->line = this->line();
+	    declarations->push_back(recordDecl);
+	    this->eat(ttype::end);
+	    this->eat(ttype::semi);
+	}
         else break;
     }
     return declarations;
 }
 
-vector<AST*>* Parser::formalParameters() {
-    vector<AST*>* paramNodes = new vector<AST*>();
+vector<Param*>* Parser::formalParameters() {
+    vector<Param*>* paramNodes = new vector<Param*>();
     vector<Token*> paramTokens = { currentToken };
     this->eat(ttype::id);
     while (currentToken->type == ttype::comma) {
@@ -431,16 +177,16 @@ vector<AST*>* Parser::formalParameters() {
     return paramNodes;
 }
 
-vector<AST*>* Parser::formalParameterList() {
+vector<Param*>* Parser::formalParameterList() {
     if (currentToken->type != ttype::id) {
-        return new vector<AST*>();
+        return new vector<Param*>();
     }
-    vector<AST*>* paramNodes = this->formalParameters();
-    vector<AST*>* formalParams;
+    vector<Param*>* paramNodes = this->formalParameters();
+    vector<Param*>* formalParams;
     while (currentToken->type == ttype::semi) {
         this->eat(ttype::semi);
         formalParams = this->formalParameters();
-        utils::combineArrs(*paramNodes, *formalParams);
+        utils::combineArrs<Param>(paramNodes, formalParams);
     }
     return paramNodes;
 }
@@ -470,18 +216,16 @@ vector<AST*>* Parser::variableDeclarations() {
 
 AST* Parser::typeSpec() {
     Token* token = currentToken;
-    if (currentToken->type == ttype::integer) {
-        this->eat(ttype::integer);
+    if (this->validTypes.find(currentToken->value.strVal) == validTypes.end()) {
+        this->error(currentToken->value.strVal + " is not a valid type");
     }
-    else {
-        this->eat(ttype::real);
-    }
+    eat(token->type);
     Type* type = new Type(token);
     type->line = this->line();
     return type;
 }
 
-AST* Parser::ifStatement(bool isElseIf = false) {
+AST* Parser::ifStatement(bool isElseIf) {
     int line = this->line();
     this->eat(ttype::tif);
     this->eat(ttype::lparen);
@@ -530,8 +274,7 @@ AST* Parser::whileStatement() {
 AST* Parser::compoundStatement() {
     this->eat(ttype::begin);
     vector<AST*>* nodes = this->statementList();
-    this->eat(ttype::end);
-
+    this->eat(ttype::end);    
     Compound* root = new Compound();
     root->line = this->line();
     for (AST* node : *nodes) {
@@ -676,6 +419,10 @@ AST* Parser::factor() {
         this->eat(ttype::real_const);
         return new Num(token);
     }
+    else if (token->type == ttype::string_literal) {
+	this->eat(ttype::string_literal);
+	return new StringLiteral(token);
+    }
     else if (token->type == ttype::lparen) {
         AST* node;
         this->eat(ttype::lparen);
@@ -711,258 +458,167 @@ SemanticAnalyzer::SemanticAnalyzer() : currentScope(nullptr) {
 void SemanticAnalyzer::visit(AST* node) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
-        case NodeType::block: {
-            Block* blockNode = dynamic_cast<Block*>(node);
-            for (AST* declaration : blockNode->declarations) {
-                this->visit(declaration);
-            }
-            this->visit(blockNode->compoundStatement);
-            break;
-        }
-        case NodeType::program: {
-            if (options::showST) {
-                cout << "ENTER scope: global" << endl;
-            }
-            ScopedSymbolTable* globalScope = new ScopedSymbolTable("global", 1, currentScope);
-            currentScope = globalScope;
-            Program* progNode = dynamic_cast<Program*>(node);
-            this->visit(progNode->block);
-            if (options::showST) {
-                cout << globalScope->toString() << endl;
-                cout << "LEAVE scope: global" << endl;
-            }
-            progNode->table = currentScope;
-            currentScope = currentScope->enclosingScope;
-            break;
-        }
-        case NodeType::compound: {
-            Compound* compNode = dynamic_cast<Compound*>(node);
-            for (AST* child : compNode->children) {
-                this->visit(child);
-            }
-            break;
-        }
-        case NodeType::none: {
-            break;
-        }
-        case NodeType::binOp: {
-            BinOp* binOpNode = dynamic_cast<BinOp*>(node);
-            this->visit(binOpNode->left);
-            this->visit(binOpNode->right);
-            break;
-        }
-        case NodeType::varDecl: {
-            VarDecl* varDeclNode = dynamic_cast<VarDecl*>(node);
-            Var* varNode = dynamic_cast<Var*>(varDeclNode->varNode);
-            Type* typeNode = dynamic_cast<Type*>(varDeclNode->typeNode);
-            string typeName = typeNode->value.strVal;
-            Symbol* typeSymbol;
-            if (!(typeSymbol = currentScope->lookup(typeName))) {
-                utils::fatalError("Semantic error: no type symbol found for type name " + typeName + " on line " + to_string(varNode->token->line));
-            }
-            string varName = varNode->value.strVal;
-            if (currentScope->lookup(varName)) {
-                utils::fatalError("Semantic error: duplicate identifier " + varName + " found on line " + to_string(varNode->token->line));
-            }
-            currentScope->define(new VarSymbol(varName, typeSymbol));
-            break;
-        }
-        case NodeType::assign: {
-            Assign* assignNode = dynamic_cast<Assign*>(node);
-            this->visit(assignNode->left);
-            this->visit(assignNode->right);
-            break;
-        }
-        case NodeType::var: {
-            Var* varNode = dynamic_cast<Var*>(node);
-            if (!currentScope->lookup(varNode->value.strVal)) {
-                utils::fatalError("Semantic error: symbol not found for variable " + varNode->value.strVal + " on line " + to_string(varNode->token->line));
-            }
-            break;
-        }
-        case NodeType::procedureDecl: {
-            ProcedureDecl* procDecNode = dynamic_cast<ProcedureDecl*>(node);
-            string procName = procDecNode->procName;
-            ProcedureSymbol* procSymbol = new ProcedureSymbol(procName);
-            currentScope->define(procSymbol);
-            procedureTable[procSymbol] = procDecNode;
-            if (options::showST) {
-                cout << "ENTER scope: " << procName << endl;
-            }
-            ScopedSymbolTable* procedureScope = new ScopedSymbolTable(procName, currentScope->scopeLevel + 1, currentScope);
-            currentScope = procedureScope;
+    case NodeType::block: {
+	Block* blockNode = dynamic_cast<Block*>(node);
+	for (AST* declaration : blockNode->declarations) {
+	    this->visit(declaration);
+	}
+	this->visit(blockNode->compoundStatement);
+	break;
+    }
+    case NodeType::program: {
+	if (options::showST) {
+	    cout << "ENTER scope: global" << endl;
+	}
+	ScopedSymbolTable* globalScope = new ScopedSymbolTable("global", 1, currentScope);
+	currentScope = globalScope;
+	Program* progNode = dynamic_cast<Program*>(node);
+	this->visit(progNode->block);
+	if (options::showST) {
+	    cout << globalScope->toString() << endl;
+	    cout << "LEAVE scope: global" << endl;
+	}
+	progNode->table = currentScope;
+	currentScope = currentScope->enclosingScope;
+	break;
+    }
+    case NodeType::compound: {
+	Compound* compNode = dynamic_cast<Compound*>(node);
+	for (AST* child : compNode->children) {
+	    this->visit(child);
+	}
+	break;
+    }
+    case NodeType::none: {
+	break;
+    }
+    case NodeType::binOp: {
+	BinOp* binOpNode = dynamic_cast<BinOp*>(node);
+	this->visit(binOpNode->left);
+	this->visit(binOpNode->right);
+	break;
+    }
+    case NodeType::varDecl: {
+	VarDecl* varDeclNode = dynamic_cast<VarDecl*>(node);
+	Var* varNode = dynamic_cast<Var*>(varDeclNode->varNode);
+	Type* typeNode = dynamic_cast<Type*>(varDeclNode->typeNode);
+	string typeName = typeNode->value.strVal;
+	Symbol* typeSymbol;
+	if (!(typeSymbol = currentScope->lookup(typeName))) {
+	    utils::fatalError("Semantic error: no type symbol found for type name " + typeName + " on line " + to_string(varNode->token->line));
+	}
+	string varName = varNode->value.strVal;
+	Symbol* varSymbol;
+	if ((varSymbol = currentScope->lookup(varName)) && varSymbol->type != nullptr) {
+	    utils::fatalError("Semantic error: duplicate identifier " + varName + " found on line " + to_string(varNode->token->line));
+	}
+	currentScope->define(new VarSymbol(varName, typeSymbol));
+	break;
+    }
+    case NodeType::recordDecl: {
+	RecordDecl* recordDeclNode = dynamic_cast<RecordDecl*>(node);
+	currentScope->define(new UserDefinedTypeSymbol(recordDeclNode->recordName));
+	break;
+    }
+    case NodeType::assign: {
+	Assign* assignNode = dynamic_cast<Assign*>(node);
+	this->visit(assignNode->left);
+	this->visit(assignNode->right);
+	break;
+    }
+    case NodeType::var: {
+	Var* varNode = dynamic_cast<Var*>(node);
+	if (!currentScope->lookup(varNode->value.strVal)) {
+	    utils::fatalError("Semantic error: symbol not found for variable " + varNode->value.strVal + " on line " + to_string(varNode->token->line));
+	}
+	break;
+    }
+    case NodeType::procedureDecl: {
+	ProcedureDecl* procDecNode = dynamic_cast<ProcedureDecl*>(node);
+	string procName = procDecNode->procName;
+	ProcedureSymbol* procSymbol = new ProcedureSymbol(procName);
+	currentScope->define(procSymbol);
+	procedureTable[procSymbol] = procDecNode;
+	if (options::showST) {
+	    cout << "ENTER scope: " << procName << endl;
+	}
+	ScopedSymbolTable* procedureScope = new ScopedSymbolTable(procName, currentScope->scopeLevel + 1, currentScope);
+	currentScope = procedureScope;
             
-            for (AST* param : *(procDecNode->params)) {
-                Param* paramNode = dynamic_cast<Param*>(param);
-                Type* paramType = dynamic_cast<Type*>(paramNode->typeNode);
-                Symbol* paramTypeSymbol = currentScope->lookup(paramType->value.strVal);
-                Var* paramVarNode = dynamic_cast<Var*>(paramNode->varNode);
-                VarSymbol* varSymbol = new VarSymbol(paramVarNode->value.strVal, paramTypeSymbol);
-                currentScope->define(varSymbol);
-                procSymbol->params->push_back(varSymbol);
-            }
-            procDecNode->table = currentScope;
-            this->visit(procDecNode->blockNode);
-            currentScope = currentScope->enclosingScope;
-            if (options::showST) {
-                cout << procedureScope->toString() << endl;
-                cout << "LEAVE scope: " << procName << endl;
-            }
-            break;
-        }
-        case NodeType::procedureCall: {
-            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
-            string procName = procCallNode->procName;
-            Symbol* result;
-            if (!(result = currentScope->lookup(procName))) {
-                utils::fatalError("Semantic error: no procedure found with name " + procName);
-            }
-            ProcedureSymbol* procSymbol = dynamic_cast<ProcedureSymbol*>(result);
-            map<ProcedureSymbol*, AST*>::iterator iter;
-            if ((iter = procedureTable.find(procSymbol)) == procedureTable.end()) {
-                utils::fatalError("Semantic error: procedure declaration node could not be found in program tree");
-            }
-            procCallNode->procDeclNode = iter->second;
-            break;
-        }
-        case NodeType::ifStatement: {
-            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
-            this->visit(ifStatementNode->conditionNode);
-            this->visit(ifStatementNode->blockNode);
-            if (ifStatementNode->elseBranch) {
-                this->visit(ifStatementNode->elseBranch);
-            }
-            break;
-        }
-        case NodeType::whileStatement: {
-            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
-            this->visit(whileStatementNode->conditionNode);
-            this->visit(whileStatementNode->blockNode);
-            break;
-        }
-        default:
-            break;
+	for (AST* param : *(procDecNode->params)) {
+	    Param* paramNode = dynamic_cast<Param*>(param);
+	    Type* paramType = dynamic_cast<Type*>(paramNode->typeNode);
+	    Symbol* paramTypeSymbol = currentScope->lookup(paramType->value.strVal);
+	    Var* paramVarNode = dynamic_cast<Var*>(paramNode->varNode);
+	    VarSymbol* varSymbol = new VarSymbol(paramVarNode->value.strVal, paramTypeSymbol);
+	    currentScope->define(varSymbol);
+	    procSymbol->params->push_back(varSymbol);
+	}
+	procDecNode->table = currentScope;
+	this->visit(procDecNode->blockNode);
+	currentScope = currentScope->enclosingScope;
+	if (options::showST) {
+	    cout << procedureScope->toString() << endl;
+	    cout << "LEAVE scope: " << procName << endl;
+	}
+	break;
+    }
+    case NodeType::procedureCall: {
+	ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
+	string procName = procCallNode->procName;
+	Symbol* result;
+	if (!(result = currentScope->lookup(procName))) {
+	    utils::fatalError("Semantic error: no procedure found with name " + procName + " on line " + to_string(procCallNode->line));
+	}
+	ProcedureSymbol* procSymbol = dynamic_cast<ProcedureSymbol*>(result);
+	map<ProcedureSymbol*, AST*>::iterator iter;
+	if ((iter = procedureTable.find(procSymbol)) == procedureTable.end()) {
+	    utils::fatalError("Semantic error: procedure declaration node could not be found in program tree");
+	}
+	ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(iter->second);
+	// Check for matching number of formal and actual params.
+	if (procCallNode->paramVals->size() != procDeclNode->params->size()) {
+	    utils::fatalError("Semantic error: wrong number of parameters in call to " + procDeclNode->procName + " on line " + to_string(procCallNode->line));
+	}
+	/*
+	auto fiter = procDeclNode->params->begin();
+	auto aiter = procCallNode->paramVals->begin();
+	for (;fiter != procDeclNode->params->end(); fiter++, aiter++) {
+	    
+	}
+	*/
+	VarSymbol* paramSymbol;	
+	for (Symbol* param : *(procSymbol->params)) {
+	    paramSymbol = dynamic_cast<VarSymbol*>(param);
+	    
+	}
+	procCallNode->procDeclNode = iter->second;
+	break;
+    }
+    case NodeType::ifStatement: {
+	IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+	this->visit(ifStatementNode->conditionNode);
+	this->visit(ifStatementNode->blockNode);
+	if (ifStatementNode->elseBranch) {
+	    this->visit(ifStatementNode->elseBranch);
+	}
+	break;
+    }
+    case NodeType::whileStatement: {
+	WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+	this->visit(whileStatementNode->conditionNode);
+	this->visit(whileStatementNode->blockNode);
+	break;
+    }
+    default:
+	break;
     }
 }
 
-/****************************************
- Call Stack
- ***************************************/
-
-class CallStack {
-public:
-    CallStack();
-    void pushFrame(ScopedSymbolTable* symbolTable);
-    void pushFrame(ScopedSymbolTable* symbolTable, string* formalParams, string* actualParams, ssize_t numParams);
-    void popFrame();
-    void assign(string key, string value, int line);
-    string lookup(string key, int line);
-    void printCurrentFrame();
-private:
-    struct StackFrame {
-        unordered_map<string, string> valTable;
-        StackFrame* parent;
-        ScopedSymbolTable* symbolTable;
-        StackFrame(ScopedSymbolTable* symbolTable, StackFrame* parent = nullptr) : parent(parent), symbolTable(symbolTable) {}
-        void dump() {
-            cout << "______________________________" << endl;
-            cout << "Frame: " << symbolTable->name() << endl;
-            utils::dumpMap(valTable);
-            cout << "______________________________" << endl;
-        }
-    };
-    string foundVal;
-    StackFrame* findFrame(string key);
-    StackFrame* currentFrame;
-};
-
-void CallStack::printCurrentFrame() {
-    currentFrame->dump();
-}
-
-CallStack::CallStack() {
-    currentFrame = nullptr;
-}
-
-CallStack::StackFrame* CallStack::findFrame(string key) {
-    utils::toUpper(key);
-    StackFrame* frame = currentFrame;
-    unordered_map<string, string>::iterator it;
-    if (options::dumpVars) {
-        cout << "******************************" << endl;
-    }
-    while(frame) {
-        if (options::dumpVars) {
-            frame->dump();
-        }
-        it = frame->valTable.find(key);
-        if (it == frame->valTable.end()) {
-            frame = frame->parent;
-        }
-        else {
-            if (options::dumpVars) {
-                cout << "******************************" << endl;
-            }
-            foundVal = it->second;
-            return frame;
-        }
-    }
-    return nullptr;
-}
-
-string CallStack::lookup(string key, int line = -1) {
-    if (findFrame(key)) {
-        return foundVal;
-    }
-    utils::fatalError("Could not find value for variable reference '" + key + "' on line " + to_string(line));
-    return "";
-}
-
-void CallStack::assign(string key, string value, int line = -1) {
-    utils::toUpper(key);
-    StackFrame* frame;
-    if (!currentFrame) {
-        utils::fatalError("Stack error: no initial frame pushed to call stack");
-    }
-    if (!currentFrame->symbolTable->lookup(key)) {
-        utils::fatalError("Failed assignment to undeclared variable " + value + " on line " + to_string(line));
-    }
-    if (!(frame = this->findFrame(key))) {
-        frame = currentFrame;
-    }
-    frame->valTable.insert(make_pair(key, value));
-}
-
-void CallStack::pushFrame(ScopedSymbolTable* symbolTable) {
-    StackFrame* newFrame = new StackFrame(symbolTable, currentFrame);
-    currentFrame = newFrame;
-}
-
-void CallStack::pushFrame(ScopedSymbolTable *symbolTable, string *formalParams, string *actualParams, ssize_t numParams) {
-    // Since this is for procedure calls, we can always assign to the new frame.
-    this->pushFrame(symbolTable);
-    // Populate stack value table.
-    for (unsigned int i = 0;i<numParams;i++) {
-        currentFrame->valTable.insert(make_pair(formalParams[i], actualParams[i]));
-    }
-    currentFrame->dump();
-}
-
-void CallStack::popFrame() {
-    cout << "popping frame" << endl;
-    StackFrame* oldFrame = currentFrame;
-    currentFrame = currentFrame->parent;
-    // Can't delete the symbol table, because we might need it for other
-    // frames.
-    delete oldFrame;
-    if (!currentFrame && options::dumpVars) {
-        cout << "Stack base frame popped" << endl;
-    }
-}
 
 /****************************************
  Interpreter
- ***************************************/
+***************************************/
 
 /*
  * Interpreter class definition
@@ -972,8 +628,8 @@ class Interpreter {
 public:
     Parser* parser;
     Interpreter(Parser* parser);
-    double visit(AST* node);
-    double interpret();
+    DataVal visit(AST* node);
+    DataVal interpret();
 private:
     CallStack stack;
 };
@@ -982,166 +638,182 @@ Interpreter::Interpreter(Parser* parser) {
     this->parser = parser;
 }
 
-double Interpreter::visit(AST* node) {
+DataVal Interpreter::visit(AST* node) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
     switch(node->type()) {
-        case NodeType::binOp: {
-            BinOp binNode = dynamic_cast<BinOp&>(*node);
-            string opType = binNode.op->type;
-            if (opType == ttype::plus) {
-                return visit(binNode.left) + visit(binNode.right);
-            }
-            else if (opType == ttype::minus) {
-                return visit(binNode.left) - visit(binNode.right);
-            }
-            else if (opType == ttype::mul) {
-                return visit(binNode.left) * visit(binNode.right);
-            }
-            else if (opType == ttype::int_div) {
-                return (int(visit(binNode.left)) / int(visit(binNode.right)));
-            }
-            else if (opType == ttype::float_div) {
-                return visit(binNode.left) / visit(binNode.right);
-            }
-            else if (opType == ttype::equals) {
-                double left = visit(binNode.left);
-                double right = visit(binNode.right);
-                cout << "left: " << left << " right: " << right << endl;
-                return left == right;
-            }
-            else if (opType == ttype::not_equals) {
-                double left = visit(binNode.left);
-                double right = visit(binNode.right);
-                cout << "left: " << left << " right: " << right << endl;
-                return left != right;
-            }
-            else {
-                utils::fatalError(opType + " on line " + to_string(binNode.line) + " is not a known binary operation");
-            }
-            break;
-        }
-        case NodeType::num: {
-            Num num = dynamic_cast<Num&>(*node);
-            return num.value;
-            break;
-        }
-        case NodeType::unaryOp: {
-            UnaryOp unaryNode = dynamic_cast<UnaryOp&>(*node);
-            string opType = unaryNode.op->type;
-            if (opType == ttype::plus) {
-                return visit(unaryNode.expr);
-            }
-            else if (opType == ttype::minus) {
-                return -1 * visit(unaryNode.expr);
-            }
-            else {
-                utils::fatalError(opType + " on line " + to_string(unaryNode.line) + " is not a known unary operation");
-            }
-            break;
-        }
-        case NodeType::compound: {
-            Compound compoundNode = dynamic_cast<Compound&>(*node);
-            for (AST* child : compoundNode.children) {
-                visit(child);
-            }
-            break;
-        }
-        case NodeType::none: {
-            break;
-        }
-        case NodeType::assign: {
-            Assign assignNode = dynamic_cast<Assign&>(*node);
-            Var varNode = dynamic_cast<Var&>(*assignNode.left);
-            string varName = varNode.value.strVal;
-            stack.assign(varName, to_string(visit(assignNode.right)), assignNode.line);
-            break;
-        }
-        case NodeType::var: {
-            Var varNode = dynamic_cast<Var&>(*node);
-            string varValue = stack.lookup(varNode.value.strVal, varNode.line);
-            return utils::toDouble(varValue);
-            break;
-        }
-        case NodeType::program: {
-            Program progNode = dynamic_cast<Program&>(*node);
-            stack.pushFrame(progNode.table);
-            visit(progNode.block);
-            break;
-        }
-        case NodeType::block: {
-            Block block = dynamic_cast<Block&>(*node);
-            for (AST* decl : block.declarations) {
-                visit(decl);
-            }
-            visit(block.compoundStatement);
-            break;
-        }
-        case NodeType::varDecl: {
-            break;
-        }
-        case NodeType::varType: {
-            break;
-        }
-        case NodeType::procedureDecl: {
-            break;
-        }
-        case NodeType::procedureCall: {
-            ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
-            ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
-            // Check for matching number of formal and actual params.
-            if (procCallNode->paramVals->size() != procDeclNode->params->size()) {
-                utils::fatalError("Wrong number of parameters in call to " + procDeclNode->procName + " on line " + to_string(procCallNode->line));
-            }
-            ssize_t numParams = procCallNode->paramVals->size();
-            Param* paramNode;
-            Var* varNode;
-            // Make an array for each of the formal and actual params.
-            string finalParamVals[numParams];
-            string paramNames[numParams];
-            for (unsigned int i = 0;i<numParams;i++) {
-                paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
-                varNode = dynamic_cast<Var*>(paramNode->varNode);
-                finalParamVals[i] = to_string(visit(procCallNode->paramVals->at(i)));
-                cout << "param val: " << finalParamVals[i] << endl;
-                paramNames[i] = varNode->value.strVal;
-            }
-            // Push a new stack frame and assign params.
-            stack.pushFrame(procDeclNode->table, paramNames, finalParamVals, numParams);
-            // Run procedure body.
-            visit(procDeclNode->blockNode);
-            // Pop stack framee.
-            stack.popFrame();
-            break;
-        }
-        case NodeType::ifStatement: {
-            IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
-            // Well isn't this code convenient...
-            double condition = visit(ifStatementNode->conditionNode);
-            cout << "If Condition result: " << condition << endl;
-            if (condition) {
-                visit(ifStatementNode->blockNode);
-            }
-            else if (ifStatementNode->elseBranch) {
-                visit(ifStatementNode->elseBranch);
-            }
-            break;
-        }
-        case NodeType::whileStatement: {
-            WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
-            double condition;
-            while ((condition = visit(whileStatementNode->conditionNode))) {
-                cout << "While condition result: " << condition << endl;
-                visit(whileStatementNode->blockNode);
-            }
-            break;
-        }
-        default:
-            utils::fatalError(string("Syntax tree node of type-index ") + to_string(node->type()) + string(" cannot be visited"));
+    case NodeType::binOp: {
+	BinOp binNode = dynamic_cast<BinOp&>(*node);
+	string opType = binNode.op->type;
+	/*
+	if (opType == ttype::plus) {
+	    return visit(binNode.left) + visit(binNode.right);
+	}
+	else if (opType == ttype::minus) {
+	    return visit(binNode.left) - visit(binNode.right);
+	}
+	else if (opType == ttype::mul) {
+	    return visit(binNode.left) * visit(binNode.right);
+	}
+	else if (opType == ttype::int_div) {
+	    return (int(visit(binNode.left)) / int(visit(binNode.right)));
+	}
+	else if (opType == ttype::float_div) {
+	    return visit(binNode.left) / visit(binNode.right);
+	}
+	*/
+	if (opType == ttype::equals) {
+	    DataVal left = visit(binNode.left);
+	    DataVal right = visit(binNode.right);
+	    if (options::showConditions) {
+		cout << "left: " << left.toString() << " right: " << right.toString() << endl;
+	    }
+	    return DataVal(left == right);
+	}
+	else if (opType == ttype::not_equals) {
+	    DataVal left = visit(binNode.left);
+	    DataVal right = visit(binNode.right);
+	    if (options::showConditions) {
+		cout << "left: " << left.toString() << " right: " << right.toString() << endl;
+	    }
+	    return DataVal(left != right);
+	}
+	else {
+	    utils::fatalError(opType + " on line " + to_string(binNode.line) + " is not a known binary operation");
+	}
+	break;
     }
-    return NAN;
+    case NodeType::num: {
+	Num num = dynamic_cast<Num&>(*node);
+	return num.value;
+	break;
+    }
+    case NodeType::stringLiteral: {
+	StringLiteral str = dynamic_cast<StringLiteral&>(*node);
+	return str.value;
+	break;
+    }
+    case NodeType::unaryOp: {
+	UnaryOp unaryNode = dynamic_cast<UnaryOp&>(*node);
+	string opType = unaryNode.op->type;
+	DataVal exprResult = visit(unaryNode.expr);
+	if (exprResult.isNumeric()) {
+	    if (opType == ttype::minus) {
+		switch(exprResult.type) {
+		case DataVal::D_INT: {
+		    return DataVal(-1 * DATAVAL_GET_VAL(int, exprResult.data));
+		}
+		case DataVal::D_REAL:
+		    return DataVal(-1 * DATAVAL_GET_VAL(double, exprResult.data));
+		}		    
+	    }
+	}
+	else {
+	    utils::fatalError(opType + " on line " + to_string(unaryNode.line) + " is not a known unary operation for value of type " + to_string(exprResult.type));
+	}
+	break;
+    }
+    case NodeType::compound: {
+	Compound compoundNode = dynamic_cast<Compound&>(*node);
+	for (AST* child : compoundNode.children) {
+	    visit(child);
+	}
+	break;
+    }
+    case NodeType::none: {
+	break;
+    }
+    case NodeType::assign: {
+	Assign assignNode = dynamic_cast<Assign&>(*node);
+	Var varNode = dynamic_cast<Var&>(*assignNode.left);
+	string varName = varNode.value.strVal;
+	DataVal rvalue = visit(assignNode.right);
+	stack.assign(varName, rvalue, assignNode.line);
+	break;
+    }
+    case NodeType::var: {
+	Var varNode = dynamic_cast<Var&>(*node);
+	return stack.lookup(varNode.value.strVal, varNode.line);
+	break;
+    }
+    case NodeType::program: {
+	Program progNode = dynamic_cast<Program&>(*node);
+	stack.pushFrame(progNode.table);
+	visit(progNode.block);
+	stack.popFrame();
+	break;
+    }
+    case NodeType::block: {
+	Block block = dynamic_cast<Block&>(*node);
+	for (AST* decl : block.declarations) {
+	    visit(decl);
+	}
+	visit(block.compoundStatement);
+	break;
+    }
+    case NodeType::varDecl: {
+	break;
+    }
+    case NodeType::recordDecl: {
+	break;
+    }
+    case NodeType::varType: {
+	break;
+    }
+    case NodeType::procedureDecl: {
+	break;
+    }
+    case NodeType::procedureCall: {
+	ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
+	ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
+	ssize_t numParams = procCallNode->paramVals->size();
+	Param* paramNode;
+	Var* varNode;
+	// Make an array for each of the formal and actual params.
+	DataVal finalParamVals[numParams];
+	string paramNames[numParams];
+	for (unsigned int i = 0;i<numParams;i++) {
+	    paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
+	    varNode = dynamic_cast<Var*>(paramNode->varNode);
+	    finalParamVals[i] = visit(procCallNode->paramVals->at(i));
+	    paramNames[i] = varNode->value.strVal;
+	}
+	// Push a new stack frame and assign params.
+	stack.pushFrame(procDeclNode->table, paramNames, finalParamVals, numParams);
+	// Run procedure body.
+	visit(procDeclNode->blockNode);
+	// Pop stack frame.
+	stack.popFrame();
+	break;
+    }
+    case NodeType::ifStatement: {
+	IfStatement* ifStatementNode = dynamic_cast<IfStatement*>(node);
+	// Well isn't this code convenient...
+	DataVal condition = visit(ifStatementNode->conditionNode);
+	if (options::showConditions) {
+	    cout << "If Condition result: " << condition.toString() << endl;
+	}
+	if (condition.toBool()) {
+	    visit(ifStatementNode->blockNode);
+	}
+	else if (ifStatementNode->elseBranch) {
+	    visit(ifStatementNode->elseBranch);
+	}
+	break;
+    }
+    case NodeType::whileStatement: {
+	WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
+	while (visit(whileStatementNode->conditionNode).toBool()) {
+	    visit(whileStatementNode->blockNode);
+	}
+	break;
+    }
+    default:
+	utils::fatalError(string("Syntax tree node of type-index ") + to_string(node->type()) + string(" cannot be visited"));
+    }
+    return DataVal();
 }
 
-double Interpreter::interpret() {
+DataVal Interpreter::interpret() {
     AST* tree = parser->parse();
     SemanticAnalyzer analyzer;
     analyzer.visit(tree);
@@ -1150,7 +822,7 @@ double Interpreter::interpret() {
 
 /*********************************
  Command Line Args Parser
- ********************************/
+********************************/
 
 class InputParser{
 public:
@@ -1159,8 +831,7 @@ public:
             this->tokens.push_back(std::string(argv[i]));
     }
     const std::string& getCmdOption(const std::string &option) const{
-        std::vector<std::string>::const_iterator itr;
-        itr =  std::find(this->tokens.begin(), this->tokens.end(), option);
+        auto itr =  std::find(this->tokens.begin(), this->tokens.end(), option);
         if (itr != this->tokens.end() && ++itr != this->tokens.end()){
             return *itr;
         }
@@ -1168,7 +839,7 @@ public:
     }
     bool cmdOptionExists(const std::string &option) const{
         return std::find(this->tokens.begin(), this->tokens.end(), option)
-        != this->tokens.end();
+	    != this->tokens.end();
     }
 private:
     const std::string empty;
@@ -1181,6 +852,7 @@ int main(int argc, char *argv[]) {
     options::printTokens = input.cmdOptionExists("-pt") || input.cmdOptionExists("--print-tokens");
     options::dumpVars = input.cmdOptionExists("-dv") || input.cmdOptionExists("--dump-vars");
     options::showST = input.cmdOptionExists("-sst") || input.cmdOptionExists("--show-symbol-table");
+    options::showConditions = input.cmdOptionExists("-sc") || input.cmdOptionExists("--show-conditions");
     
     if (!fileName.empty()) {
         cout << "File: " << fileName << endl;
@@ -1191,7 +863,7 @@ int main(int argc, char *argv[]) {
         Lexer lexer = Lexer(str);
         Parser parser = Parser(&lexer);
         Interpreter interpreter = Interpreter(&parser);
-        cout << interpreter.interpret() << endl;
+	interpreter.interpret();
     }
     return 0;
 }
