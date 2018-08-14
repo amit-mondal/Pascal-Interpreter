@@ -2,10 +2,7 @@
 
 using namespace std;
 
-BinOp::BinOp(AST* left, Token* op, AST* right) {
-    this->left = left;
-    this->op = op;
-    this->right = right;
+BinOp::BinOp(AST* left, Token* op, AST* right) : left(left), op(op), right(right) {
 }
 
 NodeType BinOp::type() const {
@@ -26,10 +23,7 @@ NodeType StringLiteral::type() const {
     return NodeType::stringLiteral;
 }
 
-UnaryOp::UnaryOp(Token* op, AST* expr) {
-    this->token = op;
-    this->op = op;
-    this->expr = expr;
+UnaryOp::UnaryOp(Token* op, AST* expr) : op(op), token(op), expr(expr) {
 }
 
 NodeType UnaryOp::type() const {
@@ -37,18 +31,13 @@ NodeType UnaryOp::type() const {
 }
 
 Compound::Compound() {
-    children = {};
 }
 
 NodeType Compound::type() const {
     return NodeType::compound;
 }
 
-Assign::Assign(AST* left, Token* op, AST* right) {
-    this->left = left;
-    this->right = right;
-    this->op = op;
-    this->token = op;
+Assign::Assign(AST* left, Token* op, AST* right) : left(left), right(right), token(op), op(op) {
 }
 
 NodeType Assign::type() const {
@@ -67,27 +56,22 @@ NodeType NoOp::type() const {
     return NodeType::none;
 }
 
-Program::Program(string name, AST* block) {
-    this->name = name;
-    this->block = block;
+Program::Program(string name, AST* block) : name(name), block(block) {
 }
 
 NodeType Program::type() const {
     return NodeType::program;
 }
 
-Block::Block(vector<AST*>& declarations, AST* compoundStatement) {
-    this->declarations = declarations;
-    this->compoundStatement = compoundStatement;
+Block::Block(vector<AST*>& declarations, AST* compoundStatement) : declarations(declarations),
+								   compoundStatement(compoundStatement) {
 }
 
 NodeType Block::type() const {
     return NodeType::block;
 }
 
-VarDecl::VarDecl(Var* varNode, Type* typeNode) {
-    this->varNode = varNode;
-    this->typeNode = typeNode;
+VarDecl::VarDecl(Var* varNode, Type* typeNode) : varNode(varNode), typeNode(typeNode) {   
 }
 
 NodeType VarDecl::type() const {
