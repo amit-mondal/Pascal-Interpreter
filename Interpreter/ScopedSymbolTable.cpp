@@ -1,6 +1,11 @@
 #include "ScopedSymbolTable.h"
+#include "options.h"
 
 using namespace std;
+
+// Declare static members.
+const int ScopedSymbolTable::NUM_BUILTINS;
+BuiltInTypeSymbol* ScopedSymbolTable::builtInsMap[NUM_BUILTINS];
 
 string ScopedSymbolTable::name() {
     return scopeName;
@@ -9,6 +14,14 @@ string ScopedSymbolTable::name() {
 ScopedSymbolTable::ScopedSymbolTable(string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope = nullptr) : scopeLevel(scopeLevel), scopeName(scopeName) {
     this->enclosingScope = enclosingScope;
     this->initBuiltIns();
+    
+    define(builtInsMap[builtInSymbols::INT]);
+    define(builtInsMap[builtInSymbols::REAL]);
+    define(builtInsMap[builtInSymbols::STRING]);
+    // If we only want static type checking, we don't define the "any" type.
+    if (!options::staticTypeChecking) {
+	define(builtInsMap[builtInSymbols::ANY]);
+    }
 }
 
 void ScopedSymbolTable::define(Symbol* symbol) {
@@ -26,9 +39,10 @@ Symbol* ScopedSymbolTable::lookup(string name, bool currScope) {
 }
 
 void ScopedSymbolTable::initBuiltIns() {
-    define(new BuiltInTypeSymbol("INTEGER"));
-    define(new BuiltInTypeSymbol("REAL"));
-    define(new BuiltInTypeSymbol("STRING"));
+    builtInsMap[builtInSymbols::INT] = new BuiltInTypeSymbol("INTEGER");
+    builtInsMap[builtInSymbols::REAL] = new BuiltInTypeSymbol("REAL");
+    builtInsMap[builtInSymbols::STRING] = new BuiltInTypeSymbol("STRING");    
+    builtInsMap[builtInSymbols::ANY] = new BuiltInTypeSymbol("ANY");
 }
 
 string ScopedSymbolTable::toString() const {

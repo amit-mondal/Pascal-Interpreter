@@ -6,4 +6,5 @@ namespace options {
     bool dumpVars = false;
     bool showST = false;
     bool showConditions = false;
+    bool staticTypeChecking = false;
 }

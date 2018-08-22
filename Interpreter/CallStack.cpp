@@ -8,9 +8,7 @@ void CallStack::printCurrentFrame() {
     currentFrame->dump();
 }
 
-CallStack::CallStack() {
-    currentFrame = nullptr;
-    callStackDepth = 0;
+CallStack::CallStack() : currentFrame(nullptr), callStackDepth(0) {
 }
 
 CallStack::StackFrame* CallStack::findFrame(string key) {

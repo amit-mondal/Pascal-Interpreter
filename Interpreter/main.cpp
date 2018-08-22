@@ -1,3 +1,4 @@
+
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -49,7 +50,7 @@ public:
     AST* ifStatement(bool isElseIf = false);
     AST* whileStatement();
 private:
-    unordered_set<string> validTypes = {ttype::integer, ttype::real, ttype::string};
+    unordered_set<string> validTypes = {ttype::integer, ttype::real, ttype::string, ttype::any};
     Lexer* lexer;
     Token* currentToken;
 };
@@ -339,11 +340,14 @@ AST* Parser::procedureCall() {
 }
 
 AST* Parser::assignmentStatement() {
+    int line = this->line();
     AST* left = this->variable();
     Token* token = currentToken;
     this->eat(ttype::assign);
     AST* right = this->expr();
-    return new Assign(left, token, right);
+    Assign* assignmentStatement = new Assign(left, token, right);
+    assignmentStatement->line = line;
+    return assignmentStatement;
 }
 
 AST* Parser::variable() {
@@ -453,14 +457,57 @@ public:
 			  LHS,
 			  RHS
     };
+    enum AssignmentType {
+			 ASSIGN,
+			 PROC_CALL
+    };
     void visit(AST* node, AssignmentState aState = NONE);    
 private:
     ScopedSymbolTable* currentScope;
     map<ProcedureSymbol*, AST*> procedureTable;
-    Symbol* lhsType, *rhsType;
+    void error(const string& err, int line);
+    void assignState(AssignmentState aState, Symbol* typeSymbol);
+    void resetState();
+    void resolveState(AssignmentType aType, int line);
+    Symbol* lhsType = nullptr, *rhsType = nullptr;
 };
 
 SemanticAnalyzer::SemanticAnalyzer() : currentScope(nullptr) {
+}
+
+void SemanticAnalyzer::error(const string& err, int line) {
+    utils::fatalError("Semantic error on line " + to_string(line) + ": " + err);
+}
+
+void SemanticAnalyzer::assignState(AssignmentState aState, Symbol* typeSymbol) {
+    switch (aState) {
+    case LHS: lhsType = typeSymbol;
+	break;
+    case RHS: rhsType = typeSymbol;
+	break;
+    case NONE:
+	break;
+    }	
+}
+
+void SemanticAnalyzer::resetState() {
+    lhsType = rhsType = nullptr;
+}
+
+void SemanticAnalyzer::resolveState(AssignmentType aType, int line) {
+
+    // The special "any" type can take any value.
+    if (lhsType && lhsType->name == ttype::any) {
+	utils::warning("Use of \"any\" type requires runtime type-checking, since types cannot be guaranteed during semantic analysis.");
+	return;
+    }
+
+    if (!lhsType || !rhsType) {
+	utils::warning("Could not statically resolve assignment type on line " + to_string(line));
+    } else if (lhsType->name != rhsType->name) {
+	this->error("incompatible types " + lhsType->name + " and " + rhsType->name, line);
+    }    
+    this->resetState();
 }
 
 void SemanticAnalyzer::visit(AST* node, AssignmentState aState) {
@@ -513,12 +560,12 @@ void SemanticAnalyzer::visit(AST* node, AssignmentState aState) {
 	string typeName = typeNode->value.strVal;
 	Symbol* typeSymbol;
 	if (!(typeSymbol = currentScope->lookup(typeName))) {
-	    utils::fatalError("Semantic error: no type symbol found for type name " + typeName + " on line " + to_string(varNode->token->line));
+	    this->error("no type symbol found for type name " + typeName, varNode->token->line);
 	}
 	string varName = varNode->value.strVal;
 	Symbol* varSymbol;
 	if ((varSymbol = currentScope->lookup(varName)) && varSymbol->type != nullptr) {
-	    utils::fatalError("Semantic error: duplicate identifier " + varName + " found on line " + to_string(varNode->token->line));
+	    this->error("duplicate identifier " + varName, varNode->token->line);
 	}
 	currentScope->define(new VarSymbol(varName, typeSymbol));
 	break;
@@ -530,18 +577,31 @@ void SemanticAnalyzer::visit(AST* node, AssignmentState aState) {
     }
     case NodeType::assign: {
 	Assign* assignNode = dynamic_cast<Assign*>(node);
+	// Make sure we're not assigning to a literal value.
+	if (assignNode->left->isLiteral()) {
+	    this->error("Cannot assign to literal", assignNode->line);
+	}
 	// Let recursive calls know to collect types for type-checking.	
 	this->visit(assignNode->left, LHS);
 	this->visit(assignNode->right, RHS);
+	this->resolveState(ASSIGN, assignNode->line);
 	break;
     }
     case NodeType::var: {
 	Var* varNode = dynamic_cast<Var*>(node);
-	if (!currentScope->lookup(varNode->value.strVal)) {
-	    utils::fatalError("Semantic error: symbol not found for variable " + varNode->value.strVal + " on line " + to_string(varNode->token->line));
+	Symbol* varSymbol;
+	if (!( varSymbol = currentScope->lookup(varNode->value.strVal))) {
+	    this->error("symbol not found for variable " + varNode->value.strVal, varNode->token->line);
 	}
+	this->assignState(aState, varSymbol->type);
 	break;
     }
+    case NodeType::num:
+	this->assignState(aState, ScopedSymbolTable::builtInsMap[ScopedSymbolTable::REAL]);
+	break;			  
+    case NodeType::stringLiteral:
+	this->assignState(aState, ScopedSymbolTable::builtInsMap[ScopedSymbolTable::STRING]);
+	break;
     case NodeType::procedureDecl: {
 	ProcedureDecl* procDecNode = dynamic_cast<ProcedureDecl*>(node);
 	string procName = procDecNode->procName;
@@ -577,25 +637,33 @@ void SemanticAnalyzer::visit(AST* node, AssignmentState aState) {
 	string procName = procCallNode->procName;
 	Symbol* result;
 	if (!(result = currentScope->lookup(procName))) {
-	    utils::fatalError("Semantic error: no procedure found with name " + procName + " on line " + to_string(procCallNode->line));
+	    this->error("no procedure found with name " + procName, procCallNode->line);
 	}
 	ProcedureSymbol* procSymbol = dynamic_cast<ProcedureSymbol*>(result);
 	map<ProcedureSymbol*, AST*>::iterator iter;
 	if ((iter = procedureTable.find(procSymbol)) == procedureTable.end()) {
-	    utils::fatalError("Semantic error: procedure declaration node could not be found in program tree");
+	    this->error("procedure declaration node could not be found in program tree", procCallNode->line);
 	}
 	ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(iter->second);
 	// Check for matching number of formal and actual params.
 	if (procCallNode->paramVals->size() != procDeclNode->params->size()) {
-	    utils::fatalError("Semantic error: wrong number of parameters in call to " + procDeclNode->procName + " on line " + to_string(procCallNode->line));
+	    this->error("wrong number of parameters in call to " + procDeclNode->procName, procCallNode->line);
 	}
-	/*
-	auto fiter = procDeclNode->params->begin();
+	auto fiter = procDeclNode->params->begin(); // Vector of Param*
 	auto aiter = procCallNode->paramVals->begin();
 	for (;fiter != procDeclNode->params->end(); fiter++, aiter++) {
+	    /**
+	       We won't use the same type-checking system as assignments. It's a little inefficient,
+	       but it's because type information for variables is stored in the symbol table as a 
+	       symbol, while type information for parameters is stored by directly keeping a pointer to a
+	       Type AST node in the Param node.
+	    */
+	    if (!options::staticTypeChecking && (*fiter)->typeNode->value.strVal == ttype::any) {
+		// If dynamic types are allowed, ignore assignments to "any" type.
+		continue;
+	    }
 	    
 	}
-	*/
 	VarSymbol* paramSymbol;	
 	for (Symbol* param : *(procSymbol->params)) {
 	    paramSymbol = dynamic_cast<VarSymbol*>(param);
@@ -713,7 +781,7 @@ DataVal Interpreter::visit(AST* node) {
 		}
 		case DataVal::D_REAL:
 		    return DataVal(-1 * DATAVAL_GET_VAL(double, exprResult.data));
-		}		    
+		}
 	    }
 	}
 	else {
@@ -858,10 +926,12 @@ private:
 int main(int argc, char *argv[]) {
     InputParser input(argc, argv);
     const string fileName = input.getCmdOption("-f");
-    options::printTokens = input.cmdOptionExists("-pt") || input.cmdOptionExists("--print-tokens");
-    options::dumpVars = input.cmdOptionExists("-dv") || input.cmdOptionExists("--dump-vars");
-    options::showST = input.cmdOptionExists("-sst") || input.cmdOptionExists("--show-symbol-table");
-    options::showConditions = input.cmdOptionExists("-sc") || input.cmdOptionExists("--show-conditions");
+
+    DEFINE_CMD_LINE_OPT(input, printTokens, "-pt", "--print-tokens");
+    DEFINE_CMD_LINE_OPT(input, dumpVars, "-dv", "--dump-vars");
+    DEFINE_CMD_LINE_OPT(input, showST, "-sst", "--show-symbol-table");
+    DEFINE_CMD_LINE_OPT(input, showConditions, "-sc", "--show-conditions");
+    DEFINE_CMD_LINE_OPT(input, staticTypeChecking, "-stc", "--static-type-checking");
     
     if (!fileName.empty()) {
         cout << "File: " << fileName << endl;

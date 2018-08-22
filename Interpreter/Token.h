@@ -45,6 +45,7 @@ namespace ttype {
     const std::string bang = "BANG";
     const std::string string_literal = "STRING_LITERAL";
     const std::string string = "STRING";
+    const std::string any = "ANY";
     const std::string record = "RECORD";
     const std::string type = "TYPE";
 }

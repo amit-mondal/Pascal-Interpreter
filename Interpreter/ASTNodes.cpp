@@ -2,6 +2,16 @@
 
 using namespace std;
 
+bool AST::isLiteral() {
+    switch (this->type()) {
+    case NodeType::stringLiteral:
+    case NodeType::num:
+	return true;
+    default:
+	return false;
+    }
+}
+
 BinOp::BinOp(AST* left, Token* op, AST* right) : left(left), op(op), right(right) {
 }
 

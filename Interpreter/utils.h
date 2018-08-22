@@ -14,9 +14,13 @@ class AST;
 
 namespace utils {
     
-    inline void fatalError(std::string err) {
+    inline void fatalError(const std::string err) {
         std::cerr << "FATAL: " << err << std::endl;
         exit(1);
+    }
+
+    inline void warning(const std::string warning) {
+	std::cerr << "WARNING: " << warning << std::endl;
     }
     
     inline int toInt(const char c) {

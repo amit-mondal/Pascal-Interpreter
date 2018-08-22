@@ -39,6 +39,7 @@ class ScopedSymbolTable;
 class AST {
 public:
     virtual NodeType type() const = 0;
+    virtual bool isLiteral();
     int line = -2;
 };
 
