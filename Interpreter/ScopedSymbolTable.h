@@ -1,4 +1,4 @@
-/*
+ /*
  * Symbol table class definition
  */
 
@@ -30,5 +30,8 @@ public:
 private:
     std::string scopeName;
 };
+
+#define GET_BUILT_IN_SYMBOL(type) \
+    (ScopedSymbolTable::builtInsMap[ScopedSymbolTable::builtInSymbols::type])
 
 #endif

@@ -10,5 +10,6 @@ end;
 
 begin { Main }
    num := 4;
-   num := num + 4;
+   { num := num + 4; }
+   print(num);
 end.  { Main }

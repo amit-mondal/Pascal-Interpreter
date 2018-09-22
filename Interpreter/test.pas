@@ -18,13 +18,11 @@ end;
 
 begin { Main }
    str := "look at this great string";
-   n := str;
    num := 3;
-
    if (num != 4) then begin      
       print(str);
    end;
    
    
-   print(num);
+   pritnum(num);
 end.  { Main }
