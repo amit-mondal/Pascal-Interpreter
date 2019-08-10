@@ -3,6 +3,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <map>
+#include <unordered_map>
 #include "constants.h"
 #include "Token.h"
 #include "Symbol.h"
@@ -12,6 +13,7 @@
 #include "CallStack.h"
 #include "SemanticAnalyzer.h"
 #include "options.h"
+#include "builtins.h"
 
 using namespace std;
 
@@ -22,6 +24,7 @@ using namespace std;
 /*
  * Interpreter class definition
  */
+
 
 class Interpreter {
 public:
@@ -43,10 +46,11 @@ DataVal Interpreter::visit(AST* node) {
     case NodeType::binOp: {
 	BinOp binNode = dynamic_cast<BinOp&>(*node);
 	string opType = binNode.op->type;
-	/*
+	
 	if (opType == ttype::plus) {
 	    return visit(binNode.left) + visit(binNode.right);
 	}
+	/*
 	else if (opType == ttype::minus) {
 	    return visit(binNode.left) - visit(binNode.right);
 	}
@@ -149,26 +153,31 @@ DataVal Interpreter::visit(AST* node) {
 	visit(block.compoundStatement);
 	break;
     }
-    case NodeType::varDecl: {
-	break;
-    }
-    case NodeType::recordDecl: {
-	break;
-    }
-    case NodeType::varType: {
-	break;
-    }
-    case NodeType::procedureDecl: {
-	break;
-    }
+	
+    case NodeType::varDecl:
+    case NodeType::recordDecl:
+    case NodeType::varType:
+    case NodeType::procedureDecl: break;
+	
     case NodeType::procedureCall: {
 	ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
 	ProcedureDecl* procDeclNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
-	ssize_t numParams = procCallNode->paramVals->size();
+	size_t numParams = procCallNode->paramVals->size();
 	Param* paramNode;
 	Var* varNode;
-	// Make an array for each of the formal and actual params.
 	DataVal finalParamVals[numParams];
+
+	// Run built-in functions by calling the built-in handler.
+	auto itr = builtin::FUNCTIONS.find(procCallNode->procName);
+	if (itr != builtin::FUNCTIONS.end()) {
+
+	    for (unsigned int i = 0; i < numParams; i++) {
+		finalParamVals[i] = visit(procCallNode->paramVals->at(i));
+	    }	    
+	    return itr->second.fn(vector<DataVal>(finalParamVals, finalParamVals + numParams));
+	}
+	
+	// Make an array for each of the formal and actual params.
 	string paramNames[numParams];
 	for (unsigned int i = 0;i<numParams;i++) {
 	    paramNode = dynamic_cast<Param*>(procDeclNode->params->at(i));
@@ -176,6 +185,7 @@ DataVal Interpreter::visit(AST* node) {
 	    finalParamVals[i] = visit(procCallNode->paramVals->at(i));
 	    paramNames[i] = varNode->value.strVal;
 	}
+	
 	// Push a new stack frame and assign params.
 	stack.pushFrame(procDeclNode->table, paramNames, finalParamVals, numParams);
 	// Run procedure body.

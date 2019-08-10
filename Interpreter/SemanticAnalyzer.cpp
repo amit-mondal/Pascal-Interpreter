@@ -1,4 +1,5 @@
 #include "SemanticAnalyzer.h"
+#include "builtins.h"
 
 using namespace std;
 
@@ -167,6 +168,33 @@ Symbol* SemanticAnalyzer::visitProcedureDecl(AST* node) {
 Symbol* SemanticAnalyzer::visitProcedureCall(AST* node) {
     ProcedureCall* procCallNode = dynamic_cast<ProcedureCall*>(node);
     string procName = procCallNode->procName;
+
+    /*
+      Handle built-in functions
+    */
+    auto itr = builtin::FUNCTIONS.find(procName);
+    if (itr != builtin::FUNCTIONS.end()) {
+	if (itr->second.paramTypes.size() != procCallNode->paramVals->size()) {
+	    this->error("wrong number of parameters in call to built-in " + procName, procCallNode->line); 
+	}
+	auto fiter = itr->second.paramTypes.begin();
+	auto aiter = procCallNode->paramVals->begin();
+	for (;fiter != itr->second.paramTypes.end(); fiter++, aiter++) {
+	    Symbol* typeSymbol = this->visit(*aiter);
+	    string argTypeName = ScopedSymbolTable::builtInsMap[*fiter]->name;
+	    if (!options::staticTypeChecking && argTypeName == ttype::any) {
+		// If dynamic types are allowed, ignore assignments to "any" type.
+		continue;
+	    }
+	    if (argTypeName != typeSymbol->name) {
+		this->error("type mismatch between value of type " + argTypeName + " and " \
+			    "value of type " + typeSymbol->name + " in call to built-in " + procName,
+			    procCallNode->line);
+	    }	    
+	}
+	return nullptr;
+    }
+    
     Symbol* result;
     if (!(result = currentScope->lookup(procName))) {
 	this->error("no procedure found with name " + procName, procCallNode->line);
@@ -185,13 +213,13 @@ Symbol* SemanticAnalyzer::visitProcedureCall(AST* node) {
     auto aiter = procCallNode->paramVals->begin();
     for (;fiter != procDeclNode->params->end(); fiter++, aiter++) {
 	Symbol* typeSymbol = this->visit(*aiter);
-	if ((*fiter)->typeNode->value.strVal != typeSymbol->name) {
-	    this->error("type mismatch between value of type " + (*fiter)->typeNode->value.strVal + " and " \
-			"value of type " + typeSymbol->name + " in call to " + procName, procCallNode->line);
-	}
 	if (!options::staticTypeChecking && (*fiter)->typeNode->value.strVal == ttype::any) {
 	    // If dynamic types are allowed, ignore assignments to "any" type.
 	    continue;
+	}	
+	if ((*fiter)->typeNode->value.strVal != typeSymbol->name) {
+	    this->error("type mismatch between value of type " + (*fiter)->typeNode->value.strVal + " and " \
+			"value of type " + typeSymbol->name + " in call to " + procName, procCallNode->line);
 	}
 	    
     }

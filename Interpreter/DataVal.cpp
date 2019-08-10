@@ -80,3 +80,7 @@ bool operator==(const DataVal& lhs, const DataVal& rhs) {
 bool operator!=(const DataVal& lhs, const DataVal& rhs) {
     DATAVAL_COMPARISON_BODY(!=)
 }
+
+DataVal operator+(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_COMPARISON_BODY(+)
+}

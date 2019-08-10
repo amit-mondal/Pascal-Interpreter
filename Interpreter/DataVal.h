@@ -10,7 +10,7 @@ class RecordDecl;
     if (lhs.type != rhs.type) utils::fatalError				\
 				  ("Cannot use binary operator" #OPERATOR "to compare types " + to_string(lhs.type) + " and " + to_string(rhs.type)); \
     switch(lhs.type) {							\
-    case DataVal::D_STRING: return *((string*) lhs.data) OPERATOR *((string*) rhs.data); \
+    case DataVal::D_STRING: return *((std::string*) lhs.data) OPERATOR *((std::string*) rhs.data); \
     case DataVal::D_INT: return *((int*) lhs.data) OPERATOR *((int*) rhs.data); \
     case DataVal::D_REAL: return *((double*) lhs.data) OPERATOR *((double*) rhs.data); \
     default: return false;						\
@@ -41,6 +41,7 @@ struct DataVal {
     friend std::ostream &operator<< (std::ostream& os, DataVal const& token);
     friend bool operator==(const DataVal& lhs, const DataVal& rhs);
     friend bool operator!=(const DataVal& lhs, const DataVal& rhs);
+    friend DataVal operator+(const DataVal& lhs, const DataVal& rhs);
 };
 
 #endif

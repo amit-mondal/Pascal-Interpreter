@@ -34,4 +34,7 @@ private:
 #define GET_BUILT_IN_SYMBOL(type) \
     (ScopedSymbolTable::builtInsMap[ScopedSymbolTable::builtInSymbols::type])
 
+#define BUILT_IN_TYPE(type) \
+    ScopedSymbolTable::builtInSymbols::type
+
 #endif

@@ -7,22 +7,23 @@ type Date = record
 	       Month :  integer;
 	    end;
 	    
-var str: string;
+var str1, str2: string;
 var num:real;
 var date : Date;
-var n :  any;
+var a, b :  string;
+var c :  integer;
 
-procedure print(a: string);
+procedure PrintTwice(s : string);
 begin
+   println(s);
+   println(s);
 end;
 
 begin { Main }
-   str := "look at this great string";
-   num := 3;
-   if (num != 4) then begin      
-      print(str);
-   end;
+   str1 := "hello";
+   str2 := "goodbye";
+   {print(str2);}
+   c := stoi(123)
+   println(str2 + str1);	     
    
-   
-   pritnum(num);
 end.  { Main }
