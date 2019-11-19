@@ -20,6 +20,7 @@ public:
     void eat(std::string tokenType);
     AST* program();
     AST* block();
+    ProcedureDecl* procedureDecl();
     std::vector<AST*>* declarations();
     std::vector<Param*>* formalParameters();
     std::vector<Param*>* formalParameterList();
@@ -35,8 +36,7 @@ public:
     AST* term();
     AST* factor();
     AST* parse();
-    AST* procedureCall();
-    std::vector<AST*>* actualParameters();
+    AST* procedureCall();    
     AST* ifStatement(bool isElseIf = false);
     AST* whileStatement();
 private:

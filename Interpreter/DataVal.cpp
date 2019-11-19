@@ -3,38 +3,9 @@
 
 using namespace std;
 
-void DataVal::freeData() {
-    switch(type) {
-    case D_STRING: delete (string*) data;
-	break;
-    case D_INT: delete (int*) data;
-	break;
-    case D_REAL: delete (float*) data;
-	break;
-    }
-}
+Allocator DataVal::allocator;
 
-DataVal::DataVal() {
-    this->type = D_NONE;
-    data = nullptr;
-}
-    
-DataVal::DataVal(double val) {
-    this->type = D_REAL;
-    double* newDouble = new double(val);
-    data = (void*) newDouble;
-}
-
-DataVal::DataVal(int val) {
-    this->type = D_INT;
-    int* newInt = new int(val);
-    data = (void*) newInt;
-}
-
-DataVal::DataVal(string val) {
-    this->type = D_STRING;
-    string* newStr = new string(val);
-    data = (void*) newStr;
+DataVal::DataVal() : data(nullptr), type(D_NONE) {
 }
 
 
@@ -81,6 +52,26 @@ bool operator!=(const DataVal& lhs, const DataVal& rhs) {
     DATAVAL_COMPARISON_BODY(!=)
 }
 
+bool operator<(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_COMPARISON_BODY(<)
+}
+
+bool operator>(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_COMPARISON_BODY(>)
+}
+
 DataVal operator+(const DataVal& lhs, const DataVal& rhs) {
-    DATAVAL_COMPARISON_BODY(+)
+    DATAVAL_OPERATION_BODY(+)
+}
+
+DataVal operator-(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_NUMERIC_OPERATION_BODY(-)
+}
+
+DataVal operator*(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_NUMERIC_OPERATION_BODY(*)
+}
+
+DataVal operator/(const DataVal& lhs, const DataVal& rhs) {
+    DATAVAL_NUMERIC_OPERATION_BODY(/)
 }

@@ -50,6 +50,27 @@ AST* Parser::block() {
     return block;
 }
 
+ProcedureDecl* Parser::procedureDecl() {
+    this->eat(ttype::procedure);
+    string procName = currentToken->value.strVal;
+    this->eat(ttype::id);
+    vector<Param*>* params;
+    if (currentToken->type == ttype::lparen) {
+	this->eat(ttype::lparen);
+	params = this->formalParameterList();
+	this->eat(ttype::rparen);
+    }
+    else {
+	params = new vector<Param*>();
+    }
+    this->eat(ttype::semi);
+    AST* blockNode = this->block();
+    ProcedureDecl* procDecl = new ProcedureDecl(procName, params, blockNode);
+    procDecl->line = this->line();
+    this->eat(ttype::semi);
+    return procDecl;
+}
+
 vector<AST*>* Parser::declarations() {
     vector<AST*>* declarations = new vector<AST*>();
     while (true) {
@@ -62,24 +83,7 @@ vector<AST*>* Parser::declarations() {
             }
         }
         else if (currentToken->type == ttype::procedure) {
-            this->eat(ttype::procedure);
-            string procName = currentToken->value.strVal;
-            this->eat(ttype::id);
-            vector<Param*>* params;
-            if (currentToken->type == ttype::lparen) {
-                this->eat(ttype::lparen);
-                params = this->formalParameterList();
-                this->eat(ttype::rparen);
-            }
-            else {
-                params = new vector<Param*>();
-            }
-            this->eat(ttype::semi);
-            AST* blockNode = this->block();
-            AST* procDecl = new ProcedureDecl(procName, params, blockNode);
-            procDecl->line = this->line();
-            declarations->push_back(procDecl);
-            this->eat(ttype::semi);
+	    declarations->push_back(this->procedureDecl());
         }
 	else if (currentToken->type == ttype::type) {
 	    this->eat(ttype::type);
@@ -257,7 +261,9 @@ AST* Parser::statement() {
         return this->whileStatement();
     }
     else if (currentToken->type == ttype::id) {
-        // Okay, so this is either an assignment or a function call
+	/* Because we're being naughty and poking around in the lexer internals, we have to
+	   make sure to skip whitespace. */
+	lexer->skipWhiteSpace();
         if (lexer->currentChar == '(') {
             return this->procedureCall();
         }
@@ -309,7 +315,7 @@ AST* Parser::empty() {
     return new NoOp();
 }
 
-AST* Parser::expr() {
+AST* Parser::expr() {    
     AST* node = this->term();
     unordered_set<string> types = {ttype::plus, ttype::minus};
     while (types.find(currentToken->type) != types.end()) {
@@ -328,7 +334,8 @@ AST* Parser::expr() {
 
 AST* Parser::term() {
     AST* node = this->factor();
-    unordered_set<string> types = {ttype::mul, ttype::int_div, ttype::float_div, ttype::equals, ttype::not_equals};
+    unordered_set<string> types = {ttype::mul, ttype::int_div, ttype::float_div,
+				   ttype::equals, ttype::not_equals, ttype::less_than, ttype::greater_than};
     while (types.find(currentToken->type) != types.end()) {
         Token* token = currentToken;
         if (token->type == ttype::mul) {
@@ -349,6 +356,9 @@ AST* Parser::term() {
         else if (token->type == ttype::greater_than) {
             this->eat(ttype::greater_than);
         }
+	else if (token->type == ttype::less_than) {
+	    this->eat(ttype::less_than);
+	}
         node = new BinOp(node, token, this->factor());
         node->line = this->line();
     }
@@ -384,15 +394,22 @@ AST* Parser::factor() {
         this->eat(ttype::rparen);
         return node;
     }
-    else {
-        return this->variable();
+    else if (token->type == ttype::id) {
+	/* Because we're being naughty and poking around in the lexer internals, we have to
+	   make sure to skip whitespace. */
+	lexer->skipWhiteSpace();
+        if (lexer->currentChar == '(') {
+            return this->procedureCall();
+        }
     }
+    return this->variable();
 }
 
 AST* Parser::parse() {
     AST* node = this->program();
     if (currentToken->type != ttype::eof) {
-        this->error("parsing terminated before end of file");
+	cout << *currentToken << endl;
+        this->error("parsing terminated before end of file");	
     }
     return node;
 }

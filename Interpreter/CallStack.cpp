@@ -4,7 +4,7 @@
 
 using namespace std;
 
-void CallStack::printCurrentFrame() {
+void CallStack::printCurrentFrame() const {
     currentFrame->dump();
 }
 
@@ -12,7 +12,6 @@ CallStack::CallStack() : currentFrame(nullptr), callStackDepth(0) {
 }
 
 CallStack::StackFrame* CallStack::findFrame(string key) {
-    //utils::toUpper(key);
     StackFrame* frame = currentFrame;
     if (options::dumpVars) {
         cout << "******************************" << endl;
@@ -57,6 +56,7 @@ void CallStack::assign(string key, DataVal value, int line = -1) {
         frame = currentFrame;
     }
     frame->valTable[key] = value;
+    DataVal::allocator.incRefCount(value);
 }
 
 void CallStack::pushFrame(ScopedSymbolTable* symbolTable) {
@@ -73,7 +73,9 @@ void CallStack::pushFrame(ScopedSymbolTable *symbolTable, string *formalParams, 
     this->pushFrame(symbolTable);
     // Populate stack value table.
     for (unsigned int i = 0;i<numParams;i++) {
+	currentFrame->paramNames.insert(formalParams[i]);
 	currentFrame->valTable[formalParams[i]] = actualParams[i];
+	DataVal::allocator.incRefCount(actualParams[i]);
     }
 }
 
@@ -85,6 +87,15 @@ void CallStack::popFrame() {
     currentFrame = currentFrame->parent;
     // Can't delete the symbol table, because we might need it for other
     // frames.
+
+    for (auto oldBinding : oldFrame->valTable) {
+	if (oldFrame->paramNames.find(oldBinding.first) == oldFrame->paramNames.end()) {
+	    DataVal::allocator.free(oldBinding.second);
+	} else {
+	    DataVal::allocator.decRefCount(oldBinding.second);
+	}
+    }
+    
     delete oldFrame;
     if (!currentFrame && options::dumpVars) {
         cout << "Stack base frame popped" << endl;

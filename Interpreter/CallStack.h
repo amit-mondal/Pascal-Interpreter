@@ -2,6 +2,8 @@
  Call Stack
 ***************************************/
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "ScopedSymbolTable.h"
 #include "DataVal.h"
 #include "constants.h"
@@ -17,14 +19,15 @@ public:
     void popFrame();
     void assign(std::string key, DataVal value, int line);
     DataVal lookup(std::string key, int line);
-    void printCurrentFrame();
+    void printCurrentFrame() const;
 private:
     struct StackFrame {
 	std::unordered_map<std::string, DataVal> valTable;
+	std::unordered_set<std::string> paramNames;
         StackFrame* parent;
         ScopedSymbolTable* symbolTable;
         StackFrame(ScopedSymbolTable* symbolTable, StackFrame* parent = nullptr) : parent(parent), symbolTable(symbolTable) {}
-	void dump() {
+	void dump() const {
 	    std::cout << "______________________________" << std::endl;
 	    std::cout << "Frame: " << symbolTable->name() << std::endl;
 	    for(auto elem : valTable) {

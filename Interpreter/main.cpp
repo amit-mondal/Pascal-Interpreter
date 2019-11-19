@@ -17,14 +17,6 @@
 
 using namespace std;
 
-/****************************************
- Interpreter
-***************************************/
-
-/*
- * Interpreter class definition
- */
-
 
 class Interpreter {
 public:
@@ -50,27 +42,27 @@ DataVal Interpreter::visit(AST* node) {
 	if (opType == ttype::plus) {
 	    return visit(binNode.left) + visit(binNode.right);
 	}
-	/*
 	else if (opType == ttype::minus) {
 	    return visit(binNode.left) - visit(binNode.right);
 	}
 	else if (opType == ttype::mul) {
 	    return visit(binNode.left) * visit(binNode.right);
 	}
+	/*
 	else if (opType == ttype::int_div) {
 	    return (int(visit(binNode.left)) / int(visit(binNode.right)));
 	}
+	*/
 	else if (opType == ttype::float_div) {
 	    return visit(binNode.left) / visit(binNode.right);
 	}
-	*/
 	if (opType == ttype::equals) {
 	    DataVal left = visit(binNode.left);
 	    DataVal right = visit(binNode.right);
 	    if (options::showConditions) {
 		cout << "left: " << left.toString() << " right: " << right.toString() << endl;
 	    }
-	    return DataVal(left == right);
+	    return DataVal::allocator.allocate(left == right);
 	}
 	else if (opType == ttype::not_equals) {
 	    DataVal left = visit(binNode.left);
@@ -78,7 +70,15 @@ DataVal Interpreter::visit(AST* node) {
 	    if (options::showConditions) {
 		cout << "left: " << left.toString() << " right: " << right.toString() << endl;
 	    }
-	    return DataVal(left != right);
+	    return DataVal::allocator.allocate(left != right);
+	}
+	else if (opType == ttype::less_than) {
+	    DataVal left = visit(binNode.left);
+	    DataVal right = visit(binNode.right);
+	    if (options::showConditions) {
+		cout << "left: " << left.toString() << " right: " << right.toString() << endl;
+	    }
+	    return DataVal::allocator.allocate(left < right);
 	}
 	else {
 	    utils::fatalError(opType + " on line " + to_string(binNode.line) + " is not a known binary operation");
@@ -103,10 +103,10 @@ DataVal Interpreter::visit(AST* node) {
 	    if (opType == ttype::minus) {
 		switch(exprResult.type) {
 		case DataVal::D_INT: {
-		    return DataVal(-1 * DATAVAL_GET_VAL(int, exprResult.data));
+		    return DataVal::allocator.allocate(-1 * DATAVAL_GET_VAL(int, exprResult.data));
 		}
 		case DataVal::D_REAL:
-		    return DataVal(-1 * DATAVAL_GET_VAL(double, exprResult.data));
+		    return DataVal::allocator.allocate(-1 * DATAVAL_GET_VAL(double, exprResult.data));
 		}
 	    }
 	}
@@ -266,7 +266,6 @@ int main(int argc, char *argv[]) {
     DEFINE_CMD_LINE_OPT(input, staticTypeChecking, "-stc", "--static-type-checking");
     
     if (!fileName.empty()) {
-        cout << "File: " << fileName << endl;
         ifstream file(fileName);
         stringstream buffer;
         buffer << file.rdbuf();

@@ -1,4 +1,4 @@
- #include "ASTNodes.h"
+#include "ASTNodes.h"
 
 using namespace std;
 
@@ -19,14 +19,14 @@ NodeType BinOp::type() const {
     return NodeType::binOp;
 }
 
-Num::Num(Token* token) : value(DataVal(token->value.numVal)), token(token) {
+Num::Num(Token* token) : value(DataVal::allocator.allocate(token->value.numVal)), token(token) {
 }
 
 NodeType Num::type() const {
     return NodeType::num;
 }
 
-StringLiteral::StringLiteral(Token* token) : value(DataVal(token->value.strVal)), token(token) {
+StringLiteral::StringLiteral(Token* token) : value(DataVal::allocator.allocate(token->value.strVal)), token(token) {
 }
 
 NodeType StringLiteral::type() const {

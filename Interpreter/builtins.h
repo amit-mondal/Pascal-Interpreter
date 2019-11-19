@@ -16,9 +16,12 @@
 #define BUILTIN_ENTRY(name, returnType, ...) \
     { #name, { #name, &builtIn_ ## name, returnType, { __VA_ARGS__ }} }
 
+
+BUILTIN(DUMP);
 BUILTIN(PRINT);
 BUILTIN(PRINTLN);
-BUILTIN(STOI);
+BUILTIN(SLEEP);
+BUILTIN(STRMODIFY);
 
 namespace builtin {
 
@@ -31,9 +34,11 @@ namespace builtin {
 
     const std::unordered_map<std::string, Fn> FUNCTIONS =
 	{
+	 BUILTIN_ENTRY(DUMP, nullptr, BUILT_IN_TYPE(ANY)),
 	 BUILTIN_ENTRY(PRINT, nullptr, BUILT_IN_TYPE(STRING)),
 	 BUILTIN_ENTRY(PRINTLN, nullptr, BUILT_IN_TYPE(STRING)),
-	 BUILTIN_ENTRY(STOI, GET_BUILT_IN_SYMBOL(INT), BUILT_IN_TYPE(STRING))
+	 BUILTIN_ENTRY(SLEEP, nullptr, BUILT_IN_TYPE(REAL)),
+	 BUILTIN_ENTRY(STRMODIFY, nullptr, BUILT_IN_TYPE(STRING), BUILT_IN_TYPE(STRING),  BUILT_IN_TYPE(REAL))
 	};
 
     void error(const std::string& err, const std::string& name);

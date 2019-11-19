@@ -20,8 +20,7 @@ public:
     Token* getNextToken();
     char peek();
     Token* id();
-    Token* stringLiteral();
-    
+    Token* stringLiteral();    
 private:
     const std::unordered_map<std::string, Token*> RESERVED_KEYWORDS = {
         { "BEGIN" , new Token(ttype::begin, "BEGIN", -1) },

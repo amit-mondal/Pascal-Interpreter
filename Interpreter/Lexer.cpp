@@ -90,7 +90,11 @@ Token* Lexer::getNextToken() {
             return new Token(ttype::semi, ';', line);
         }
         if (currentChar == '.') {
-            advance();
+	    char next = peek();
+	    if (next != '\0' && isdigit(next)) {
+		return number();
+	    }
+	    advance();
             return new Token(ttype::dot, '.', line);
         }
         if (currentChar == ',') {

@@ -56,7 +56,7 @@ namespace ttype {
 enum TokenValType {
     Char,
     Double,
-    String
+    String,
 };
 
 /*
@@ -67,6 +67,7 @@ struct TokenVal {
     double numVal;
     char charVal;
     std::string strVal;
+    int intVal;
     TokenValType type;
     TokenVal(TokenValType type) {
         this->type = type;
@@ -76,20 +77,17 @@ struct TokenVal {
     }
     std::string toString() const {
         switch(type) {
-            case TokenValType::String: {
-                return strVal;
-                break;
-            }
-            case TokenValType::Double: {
-                return std::to_string(numVal);
-                break;
-            }
-            case TokenValType::Char: {
-                std::string res = " ";
-                res[0] = charVal;
-                return res;
-                break;
-            }
+	case TokenValType::String: {
+	    return strVal;
+	}
+	case TokenValType::Double: {
+	    return std::to_string(numVal);
+	}
+	case TokenValType::Char: {
+	    std::string res = " ";
+	    res[0] = charVal;
+	    return res;
+	}
         }
     }
 };

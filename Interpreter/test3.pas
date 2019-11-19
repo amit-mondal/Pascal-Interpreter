@@ -2,14 +2,20 @@
 
 program Main;
 	    
-var num : real;
+var num : any;
 
-procedure print(a: string);
+procedure foo();
+var i : real;
 begin
+   i := 0;
+   while (i != 10000) do begin
+      println("hello ");
+      sleep(1);
+      i := i * 1.4;
+      dump(i);
+   end;
 end;
 
 begin { Main }
-   num := 4;
-   { num := num + 4; }
-   print(num);
+   foo();
 end.  { Main }

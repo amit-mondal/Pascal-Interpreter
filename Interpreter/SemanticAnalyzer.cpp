@@ -11,6 +11,11 @@ void SemanticAnalyzer::error(const string& err, int line) {
 }
 
 bool SemanticAnalyzer::resolveTypes(Symbol* lhs, Symbol* rhs, int line) {
+
+    if (lhs->name == ttype::any) {
+	return true;
+    }
+    
     bool res = lhs->name == rhs->name;
     if (!res) {
 	this->error("type mismatch between value of type " + lhs->name + " and value of type " + rhs->name, line);
@@ -21,12 +26,18 @@ bool SemanticAnalyzer::resolveTypes(Symbol* lhs, Symbol* rhs, int line) {
 Symbol* SemanticAnalyzer::visit(AST* node) {
     if (node == nullptr) utils::fatalError(string("Parse tree is null"));
 
+    if (node->type() == none) {
+	return nullptr;
+    }
+
     auto itr = this->visitorTable.find(node->type());
     if (itr != this->visitorTable.end()) {
 	/*
 	  "this" is an implied first argument for non-static methods
 	*/
 	return itr->second(this, node);
+    } else {
+	this->error("No visitor for node of type index " + to_string(node->type()), node->line);
     }
 
     return nullptr;
@@ -174,8 +185,10 @@ Symbol* SemanticAnalyzer::visitProcedureCall(AST* node) {
     */
     auto itr = builtin::FUNCTIONS.find(procName);
     if (itr != builtin::FUNCTIONS.end()) {
-	if (itr->second.paramTypes.size() != procCallNode->paramVals->size()) {
-	    this->error("wrong number of parameters in call to built-in " + procName, procCallNode->line); 
+	unsigned int nFormalParams = itr->second.paramTypes.size();
+	unsigned int nActualParams = procCallNode->paramVals->size();
+	if (nFormalParams != nActualParams) {
+	    this->error("expected " + to_string(nFormalParams) + " arguments, got " + to_string(nActualParams) + " in call to built-in " + procName, procCallNode->line); 
 	}
 	auto fiter = itr->second.paramTypes.begin();
 	auto aiter = procCallNode->paramVals->begin();
@@ -192,7 +205,7 @@ Symbol* SemanticAnalyzer::visitProcedureCall(AST* node) {
 			    procCallNode->line);
 	    }	    
 	}
-	return nullptr;
+	return itr->second.returnType;
     }
     
     Symbol* result;

@@ -12,24 +12,24 @@
  */
 
 enum NodeType {
-    none,
-    binOp,
-    num,
-    stringLiteral,
-    unaryOp,
-    assign,
-    var,
-    compound,
-    program,
-    block,
-    varDecl,
-    varType,
-    procedureDecl,
-    param,
-    procedureCall,
-    ifStatement,
-    whileStatement,
-    recordDecl
+	       none = 0,
+	       binOp,
+	       num,
+	       stringLiteral,
+	       unaryOp,
+	       assign,
+	       var,
+	       compound,
+	       program,
+	       block,
+	       varDecl,
+	       varType,
+	       procedureDecl,
+	       param,
+	       procedureCall,
+	       ifStatement,
+	       whileStatement,
+	       recordDecl
 };
 
 class ScopedSymbolTable;
@@ -163,6 +163,7 @@ class ProcedureDecl: public AST {
 public:
     std::string procName;
     AST* blockNode;
+    Type* returnTypeNode;
     std::vector<Param*>* params;
     ScopedSymbolTable* table;
     ProcedureDecl(std::string procName, std::vector<Param*>* params, AST* blockNode);
