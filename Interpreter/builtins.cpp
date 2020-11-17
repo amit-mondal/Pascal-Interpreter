@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -46,4 +45,43 @@ BUILTIN(STRMODIFY) {
     }
     (*str)[index] = other_str[0];
     return DataVal();
+}
+
+BUILTIN(PANIC) {
+    cout << "Panicking! Stack trace:" << endl;
+    while (!stack->empty()) {
+	stack->printCurrentFrame();
+	stack->popFrame();
+    }
+    exit(1);
+    return DataVal();
+}
+
+BUILTIN(BIND) {
+    string& varname = DATAVAL_GET_VAL(string, args[0].data);
+    stack->assign(varname, args[1], -1);
+    stack->lookup(varname, -1);
+    return DataVal();
+}
+
+BUILTIN(PARSEINT) {
+    const string& intstr = DATAVAL_GET_VAL(string, args[0].data);
+    int res = std::stoi(intstr);
+    return DataVal::allocator.allocate(res);
+}
+
+BUILTIN(INPUT) {
+    string res;
+    getline(cin, res);
+    return DataVal::allocator.allocate(res);
+}
+
+BUILTIN(INT_TO_REAL) {
+    int val = DATAVAL_GET_VAL(int, args[0].data);
+    return DataVal::allocator.allocate((double) val);
+}
+
+BUILTIN(REAL_TO_INT) {
+    double val = DATAVAL_GET_VAL(double, args[0].data);
+    return DataVal::allocator.allocate((int) val);
 }

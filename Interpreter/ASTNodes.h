@@ -29,7 +29,8 @@ enum NodeType {
 	       procedureCall,
 	       ifStatement,
 	       whileStatement,
-	       recordDecl
+	       recordDecl,
+	       returnStatement
 };
 
 class ScopedSymbolTable;
@@ -166,7 +167,7 @@ public:
     Type* returnTypeNode;
     std::vector<Param*>* params;
     ScopedSymbolTable* table;
-    ProcedureDecl(std::string procName, std::vector<Param*>* params, AST* blockNode);
+    ProcedureDecl(std::string procName, std::vector<Param*>* params, AST* blockNode, Type* returnType);
     virtual NodeType type() const;
 };
 
@@ -201,6 +202,14 @@ public:
     WhileStatement(AST* conditionNode, AST* blockNode);
     AST* conditionNode;
     AST* blockNode;
+    virtual NodeType type() const;
+};
+
+class ReturnStatement: public AST {
+public:
+    ReturnStatement(AST* expr, ProcedureDecl* procDecl);
+    AST* expr;
+    ProcedureDecl* procDecl;
     virtual NodeType type() const;
 };
 

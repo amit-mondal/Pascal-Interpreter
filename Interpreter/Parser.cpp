@@ -63,11 +63,22 @@ ProcedureDecl* Parser::procedureDecl() {
     else {
 	params = new vector<Param*>();
     }
+    Type* returnType = nullptr;
+
+    /* The proc returns a value */
+    if (currentToken->type == ttype::arrow) {
+	this->eat(ttype::arrow);
+	returnType = this->typeSpec();
+    }
+
+    ProcedureDecl* procDecl = new ProcedureDecl(procName, params, nullptr, returnType);
+    this->currProc = procDecl;
     this->eat(ttype::semi);
-    AST* blockNode = this->block();
-    ProcedureDecl* procDecl = new ProcedureDecl(procName, params, blockNode);
+    AST* blockNode = this->block();   
     procDecl->line = this->line();
+    procDecl->blockNode = blockNode;
     this->eat(ttype::semi);
+    this->currProc = nullptr;
     return procDecl;
 }
 
@@ -94,7 +105,7 @@ vector<AST*>* Parser::declarations() {
 	    vector<AST*>* varDecls = new vector<AST*>();
 	    while (currentToken->type == ttype::id) {
 		vector<AST*>* varDecl = this->variableDeclarations();
-		utils::combineArrs<AST>(varDecls, varDecl);
+		utils::combineArrs(varDecls, varDecl);
 		this->eat(ttype::semi);
 	    }
 	    RecordDecl* recordDecl = new RecordDecl(recordName, varDecls);
@@ -271,6 +282,9 @@ AST* Parser::statement() {
             return this->assignmentStatement();
         }
     }
+    else if (currentToken->type == ttype::ret) {
+	return this->returnStatement();
+    }
     return this->empty();
 }
 
@@ -302,6 +316,26 @@ AST* Parser::assignmentStatement() {
     Assign* assignmentStatement = new Assign(left, token, right);
     assignmentStatement->line = line;
     return assignmentStatement;
+}
+
+AST* Parser::returnStatement() {
+
+    if (!this->currProc) {
+	this->error("return statement found outside of procedure declaration");
+	return nullptr;
+    }
+
+    if (this->currProc->returnTypeNode == nullptr) {
+	this->error("cannot have return statement in void procedure");
+	return nullptr;
+    };
+    
+    int line = this->line();    
+    this->eat(ttype::ret);
+    auto expr = this->expr();
+    ReturnStatement* retStatement = new ReturnStatement(expr, this->currProc);
+    retStatement->line = line;
+    return retStatement;
 }
 
 AST* Parser::variable() {

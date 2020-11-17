@@ -1,16 +1,61 @@
 #include "DataVal.h"
+#include "options.h"
 #include <iostream>
 #include <algorithm>
 
 using namespace std;
+
+
+template <typename T>
+std::pair<size_t, T*> pool<T>::alloc() {
+    size_t lastIdx = 0;
+    auto itr = useList.begin();
+    if (itr != useList.end()) {
+	while (itr != useList.end()) {
+	    if (lastIdx < *itr) {
+		break;
+	    }
+	    lastIdx = *itr + 1;
+	    itr++;
+	}
+    }
+    if (lastIdx > POOL_SIZE - 1) {
+	utils::fatalError("Allocator out of memory");
+    }
+    useList.push_back(lastIdx);
+    ctr++;	    
+    return {lastIdx, &poolBuf[lastIdx]};
+}
+
+template <typename T>
+bool pool<T>::free(size_t listIdx) {
+    for (auto itr = useList.begin(); itr != useList.end(); itr++) {
+	if (*itr == listIdx) {
+	    useList.erase(itr);
+	    ctr--;
+	    return true;
+	}
+	if (*itr > listIdx) {
+	    return false;
+	}
+    }
+    return false;
+}
+
+template <typename T>
+double pool<T>::percentFull() const {
+    return ((double) useList.size() * 100 / POOL_SIZE);
+}
 
 Allocator::Allocator() {
     
 }
 
 template <typename T>
-DataVal Allocator::allocCommon(int type, pool<T> pool, T val) {
-    cout << "allocating " << val << endl;
+DataVal Allocator::allocCommon(int type, pool<T>& pool, T val) {
+    if (options::showAllocations) {
+	cout << "allocating, pool for " << type << " is " << pool.percentFull() << "% full" << endl;
+    }
     DataVal dval;
     auto idxWithVal = pool.alloc();
     *idxWithVal.second = val;
@@ -35,7 +80,7 @@ DataVal Allocator::allocate(string val) {
 void Allocator::incRefCount(DataVal val) {
     auto itr = refCounts.find(val.data);
     if (itr == refCounts.end()) {
-	refCounts[val.data] = {1, val};
+	refCounts.insert({val.data, {1, val}});
     } else {
 	itr->second.first++;
     }
@@ -73,7 +118,9 @@ void Allocator::gc() {
 }
 
 void Allocator::free(DataVal val, bool removeRefCount) {
-    cout << "freeing " << val << endl;
+    if (options::showAllocations) {
+	cout << "freeing " << val << endl;
+    }
 
     if (removeRefCount) {
 	if (refCounts.find(val.data) != refCounts.end()) {
@@ -89,7 +136,9 @@ void Allocator::free(DataVal val, bool removeRefCount) {
 	break;
     case DataVal::D_REAL: res = doublePool.free(val.listIdx);
 	break;
-    default: utils::fatalError("trying to free unsupported DataVal type");
+    case DataVal::D_NONE: utils::fatalError("trying to free empty value");
+	break;
+    default: utils::fatalError("trying to free unsupported DataVal type ");
     }
 
     if (!res) {

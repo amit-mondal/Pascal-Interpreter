@@ -105,6 +105,11 @@ Token* Lexer::getNextToken() {
             advance();
             return new Token(ttype::plus, '+', line);
         }
+	if (currentChar == '-' && peek() == '>') {
+	    advance();
+	    advance();
+	    return new Token(ttype::arrow, "->", line);
+	}
         if (currentChar == '-') {
             advance();
             return new Token(ttype::minus, '-', line);
@@ -174,7 +179,7 @@ char Lexer::peek() {
 Token* Lexer::id() {
     //handles identifiers and reserved keywords
     string result = "";
-    while(currentChar != '\0' && isalnum(currentChar)) {
+    while(currentChar != '\0' && (isalnum(currentChar) || currentChar == '_')) {
         result += toupper(currentChar);
         advance();
     }

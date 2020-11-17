@@ -10,6 +10,7 @@ namespace options {
     extern bool showST;
     extern bool showConditions;
     extern bool staticTypeChecking;
+    extern bool showAllocations;
 }
 
 #endif

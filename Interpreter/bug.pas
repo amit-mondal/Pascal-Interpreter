@@ -63,6 +63,6 @@ begin { Main }
    PrintTwice(a);
    strmodify(a, "e", 1);
    Append(a, "blah");
-   calculatePI();
+   calculatePI(65);
    
 end.  { Main }

@@ -38,6 +38,7 @@ private:
         { "DO", new Token(ttype::tdo, "DO", -1)},
         { "STRING", new Token(ttype::string, "STRING", -1)},
 	{ "RECORD", new Token(ttype::record, "RECORD", -1)},
-	{ "TYPE", new Token(ttype::type, "TYPE", -1)}
+	{ "TYPE", new Token(ttype::type, "TYPE", -1)},
+	{ "RETURN", new Token(ttype::ret, "RETURN", -1)}
     };
 };

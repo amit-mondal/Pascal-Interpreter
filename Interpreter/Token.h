@@ -48,6 +48,8 @@ namespace ttype {
     const std::string any = "ANY";
     const std::string record = "RECORD";
     const std::string type = "TYPE";
+    const std::string ret = "RETURN";
+    const std::string arrow = "ARROW";
 }
 
 /*

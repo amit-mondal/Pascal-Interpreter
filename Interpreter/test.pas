@@ -11,31 +11,37 @@ var num:real;
 var date : Date;
 var a :  string;
 var b, c :  real;
+var d :  integer;
 
-procedure PrintTwice(s : string);
+procedure dumpln(v : any);
 begin
-   println(s);
-   println(s);
+   dump(v);
+   println("");
 end;
 
-procedure getRootTwo();
+procedure getRootTwo() -> real;
 var i, squared, tmp:  real;
 begin
    i := 1;
    squared := 1;
-   while (.00001 < (2 - squared)) do begin
+   while (.000000000001 < (2 - squared)) do
+   begin
       i := i + .001;
       squared := i * i;
-      dump(squared);
-      println("");
    end;
-   dump(i);
-   dump(squared);
+   return i;
+end;
+
+procedure isFive(b : real) -> real;
+begin
+   if (b = 5) then begin
+      return 1;
+   end;
 end;
 
 begin { Main }
 
-   {date.Year = 33;}
-
-   getRootTwo();
+   b := getRootTwo();
+   
+   dump(isFive(4));
 end.  { Main }

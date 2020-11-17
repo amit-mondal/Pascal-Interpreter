@@ -6,6 +6,7 @@
  */
 
 #include "utils.h"
+#include <string_view>
 
 class Symbol {
 public:
@@ -20,6 +21,14 @@ public:
 	       S_VAR,
 	       S_PROCSYMBOL
     };
+
+    static constexpr std::string_view TYPE_TO_NAME[4] = {
+						"built-in type",
+						"user-defined type",
+						"variable",
+						"procedure"
+    };
+    
     virtual std::string toString() const = 0;
     virtual SymbolType stype() const = 0;
 };

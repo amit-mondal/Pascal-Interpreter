@@ -8,6 +8,10 @@ void CallStack::printCurrentFrame() const {
     currentFrame->dump();
 }
 
+bool CallStack::empty() const {
+    return callStackDepth == 0;
+}
+
 CallStack::CallStack() : currentFrame(nullptr), callStackDepth(0) {
 }
 
@@ -44,13 +48,12 @@ DataVal CallStack::lookup(string key, int line = -1) {
 }
 
 void CallStack::assign(string key, DataVal value, int line = -1) {
-    //utils::toUpper(key);
     StackFrame* frame;
     if (!currentFrame) {
         utils::fatalError("Stack error: no initial frame pushed to call stack");
     }
     if (!currentFrame->symbolTable->lookup(key)) {
-        utils::fatalError("Failed assignment to undeclared variable " + value.toString() + " on line " + to_string(line));
+        utils::fatalError("Failed assignment to undeclared variable \"" + key + "\" on line " + to_string(line));
     }
     if (!(frame = this->findFrame(key))) {
         frame = currentFrame;
@@ -79,7 +82,7 @@ void CallStack::pushFrame(ScopedSymbolTable *symbolTable, string *formalParams, 
     }
 }
 
-void CallStack::popFrame() {
+void CallStack::popFrame(void* retValPtr) {
     if (options::dumpVars) {	
 	cout << "popping frame" << endl;
     }
@@ -89,7 +92,8 @@ void CallStack::popFrame() {
     // frames.
 
     for (auto oldBinding : oldFrame->valTable) {
-	if (oldFrame->paramNames.find(oldBinding.first) == oldFrame->paramNames.end()) {
+	if ((oldBinding.second.data != retValPtr) &&
+	    oldFrame->paramNames.find(oldBinding.first) == oldFrame->paramNames.end()) {
 	    DataVal::allocator.free(oldBinding.second);
 	} else {
 	    DataVal::allocator.decRefCount(oldBinding.second);
@@ -100,4 +104,6 @@ void CallStack::popFrame() {
     if (!currentFrame && options::dumpVars) {
         cout << "Stack base frame popped" << endl;
     }
+
+    callStackDepth--;
 }

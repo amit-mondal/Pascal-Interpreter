@@ -17,6 +17,8 @@ string DataVal::toString() const {
 	return to_string(DATAVAL_GET_VAL(int, data));
     case D_REAL:
 	return to_string(DATAVAL_GET_VAL(double, data));
+    case D_NONE:
+	return "NONE";
     default:
 	break;
     }

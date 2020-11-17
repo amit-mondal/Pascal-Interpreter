@@ -2,20 +2,64 @@
 
 program Main;
 	    
-var num : any;
+var num : integer;
 
-procedure foo();
+
+type Date = record
+	       Year  : integer;
+	       Month :  integer;
+	    end;
+var blah: Date;
+var s : string;
+
+
+procedure foo() -> real;
 var i : real;
 begin
-   i := 0;
-   while (i != 10000) do begin
-      println("hello ");
-      sleep(1);
+   i := 1;
+   while (i < 100000) do begin
       i := i * 1.4;
-      dump(i);
+   end;
+   return i;
+end;
+
+procedure anyTest(a : real) -> any;
+begin
+   if (a = 5) then begin
+      return 12;
+   end
+   else begin
+      return "hello"
    end;
 end;
 
+procedure fib(n : real) -> real;
+begin
+   if (n = 0) then begin
+      return 0
+   end
+   else if (n = 1) begin
+      return 1
+   end
+   else begin
+      return fib(n - 1) + fib(n - 2);
+   end;
+end;
+
+procedure check(d : Date) -> string;
+begin
+   return "Hello";
+end;
+
 begin { Main }
-   foo();
+   println("enter a number");
+   num := parseint(input());
+   while (real_to_int(0) < num) do begin
+      println("nice");
+      num := num - real_to_int(1);
+   end;
+   dump(anyTest(5));
+
+   s := -"hello!";;
+   
 end.  { Main }

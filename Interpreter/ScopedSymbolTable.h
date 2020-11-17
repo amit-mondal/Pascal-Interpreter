@@ -14,7 +14,7 @@ public:
     ScopedSymbolTable(std::string scopeName, int scopeLevel, ScopedSymbolTable* enclosingScope);
     void define(Symbol* symbol);
     Symbol* lookup(std::string name, bool currScope = false);
-    static void initBuiltIns();
+    static bool initBuiltIns();
     std::string toString() const;
     ScopedSymbolTable* enclosingScope;
     int scopeLevel;

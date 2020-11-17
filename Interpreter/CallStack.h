@@ -16,10 +16,11 @@ public:
     CallStack();
     void pushFrame(ScopedSymbolTable* symbolTable);
     void pushFrame(ScopedSymbolTable* symbolTable, std::string* formalParams, DataVal* actualParams, ssize_t numParams);
-    void popFrame();
+    void popFrame(void* retValPtr = nullptr);
     void assign(std::string key, DataVal value, int line);
     DataVal lookup(std::string key, int line);
     void printCurrentFrame() const;
+    bool empty() const;
 private:
     struct StackFrame {
 	std::unordered_map<std::string, DataVal> valTable;

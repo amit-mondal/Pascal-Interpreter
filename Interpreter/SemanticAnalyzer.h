@@ -19,7 +19,8 @@ private:
     Symbol* visitBlock(AST* node);
     Symbol* visitProgram(AST* node);
     Symbol* visitCompound(AST* node);
-    Symbol* visitBinOp(AST* node);
+    Symbol* visitBinOp(AST* node); 
+    Symbol* visitUnaryOp(AST* node);   
     Symbol* visitVarDecl(AST* node);
     Symbol* visitRecordDecl(AST* node);
     Symbol* visitAssign(AST* node);
@@ -30,6 +31,7 @@ private:
     Symbol* visitProcedureCall(AST* node);
     Symbol* visitIfStatement(AST* node);
     Symbol* visitWhileStatement(AST* node);
+    Symbol* visitReturnStatement(AST* node);
     bool resolveTypes(Symbol* lhs, Symbol* rhs, int line);
 
     const std::map<int, std::function<Symbol*(SemanticAnalyzer*, AST*)> > visitorTable = {
@@ -37,6 +39,7 @@ private:
 		    { program, &SemanticAnalyzer::visitProgram },
 		    { compound, &SemanticAnalyzer::visitCompound },
 		    { binOp, &SemanticAnalyzer::visitBinOp },
+		    { unaryOp, &SemanticAnalyzer::visitUnaryOp },
 		    { varDecl, &SemanticAnalyzer::visitVarDecl },
 		    { recordDecl, &SemanticAnalyzer::visitRecordDecl },
 		    { assign, &SemanticAnalyzer::visitAssign },
@@ -46,7 +49,8 @@ private:
 		    { procedureDecl, &SemanticAnalyzer::visitProcedureDecl },
 		    { procedureCall, &SemanticAnalyzer::visitProcedureCall, },
 		    { ifStatement, &SemanticAnalyzer::visitIfStatement },
-		    { whileStatement, &SemanticAnalyzer::visitWhileStatement }
+		    { whileStatement, &SemanticAnalyzer::visitWhileStatement },
+		    { returnStatement, &SemanticAnalyzer::visitReturnStatement }
     };    
 };
 

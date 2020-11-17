@@ -39,7 +39,9 @@ public:
     AST* procedureCall();    
     AST* ifStatement(bool isElseIf = false);
     AST* whileStatement();
+    AST* returnStatement();
 private:
+    ProcedureDecl* currProc;
     std::unordered_set<std::string> validTypes = {ttype::integer, ttype::real, ttype::string, ttype::any};
     Lexer* lexer;
     Token* currentToken;

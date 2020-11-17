@@ -95,7 +95,7 @@ NodeType Type::type() const {
     return NodeType::varType;
 }
 
-ProcedureDecl::ProcedureDecl(string procName, vector<Param*>* params, AST* blockNode) : procName(procName), blockNode(blockNode), params(params) {
+ProcedureDecl::ProcedureDecl(string procName, vector<Param*>* params, AST* blockNode, Type* returnType) : procName(procName), blockNode(blockNode), returnTypeNode(returnType), params(params) {
     table = nullptr;
 }
 
@@ -148,4 +148,10 @@ WhileStatement::WhileStatement(AST* conditionNode, AST* blockNode) : conditionNo
 
 NodeType WhileStatement::type() const {
     return NodeType::whileStatement;
+}
+
+ReturnStatement::ReturnStatement(AST* expr, ProcedureDecl* procDecl) : expr(expr), procDecl(procDecl)  {}
+
+NodeType ReturnStatement::type() const {
+    return NodeType::returnStatement;
 }

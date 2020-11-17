@@ -7,4 +7,5 @@ namespace options {
     bool showST = false;
     bool showConditions = false;
     bool staticTypeChecking = false;
+    bool showAllocations = false;
 }

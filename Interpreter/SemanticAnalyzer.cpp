@@ -116,8 +116,13 @@ Symbol* SemanticAnalyzer::visitAssign(AST* node) {
     if (assignNode->left->isLiteral()) {
 	this->error("Cannot assign to literal", assignNode->line);
     }
-    this->resolveTypes(this->visit(assignNode->left),
-		       this->visit(assignNode->right),
+    auto lhs = this->visit(assignNode->left);
+    auto rhs = this->visit(assignNode->right);
+    if (!rhs) {
+	this->error("The right hand side does not return a value", assignNode->line);
+    }
+    this->resolveTypes(lhs,
+		       rhs,
 		       assignNode->line);
     return nullptr;
 }
@@ -129,11 +134,30 @@ Symbol* SemanticAnalyzer::visitVar(AST* node) {
 	this->error("symbol not found for variable " + varNode->value.strVal, varNode->token->line);
     }
     VarSymbol* varSymbol = dynamic_cast<VarSymbol*>(_varSymbol);
+    if (!varSymbol) {
+	this->error("Cannot use symbol \"" + _varSymbol->name + "\" of type \"" + string(Symbol::TYPE_TO_NAME[_varSymbol->stype()]) + "\" as a variable name", node->line);
+    }
     return varSymbol->type;    
 }
 
 Symbol* SemanticAnalyzer::visitNum(__attribute__((unused)) AST* node) {
     return GET_BUILT_IN_SYMBOL(REAL);
+}
+
+Symbol* SemanticAnalyzer::visitUnaryOp(AST* node) {
+    UnaryOp* unaryOp = dynamic_cast<UnaryOp*>(node);
+    auto numType = this->visit(unaryOp->expr);
+
+    if (numType == GET_BUILT_IN_SYMBOL(REAL) ||
+	numType == GET_BUILT_IN_SYMBOL(INT)) {
+	return numType;
+    }
+
+    string chStr;
+    chStr += unaryOp->op->value.charVal;
+
+    this->error("Unary operator \"" + chStr + "\" can only be used on numeric types", node->line);
+    return nullptr;
 }
 
 Symbol* SemanticAnalyzer::visitStringLiteral(__attribute__((unused)) AST* node) {
@@ -243,7 +267,16 @@ Symbol* SemanticAnalyzer::visitProcedureCall(AST* node) {
 	    
     }
     procCallNode->procDeclNode = iter->second;
-    return nullptr;
+
+    ProcedureDecl* pdNode = dynamic_cast<ProcedureDecl*>(procCallNode->procDeclNode);
+    if (!pdNode->returnTypeNode) {
+	return nullptr;
+    }    
+    auto retSymbol = currentScope->lookup(pdNode->returnTypeNode->value.strVal);
+    if (!retSymbol) {
+	this->error("procedure \"" + procName + "\" does not have a valid return type", pdNode->line);
+    }
+    return retSymbol;
 }
 
 Symbol* SemanticAnalyzer::visitIfStatement(AST* node) {
@@ -260,5 +293,13 @@ Symbol* SemanticAnalyzer::visitWhileStatement(AST* node) {
     WhileStatement* whileStatementNode = dynamic_cast<WhileStatement*>(node);
     this->visit(whileStatementNode->conditionNode);
     this->visit(whileStatementNode->blockNode);
+    return nullptr;
+}
+
+Symbol* SemanticAnalyzer::visitReturnStatement(AST* node) {
+    ReturnStatement* returnStatementNode = dynamic_cast<ReturnStatement*>(node);
+    Symbol* retStatementType = this->visit(returnStatementNode->expr);
+    Symbol* procType = currentScope->lookup(returnStatementNode->procDecl->returnTypeNode->value.strVal);
+    this->resolveTypes(procType, retStatementType, returnStatementNode->line);
     return nullptr;
 }

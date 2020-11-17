@@ -38,11 +38,12 @@ Symbol* ScopedSymbolTable::lookup(string name, bool currScope) {
     return nullptr;
 }
 
-void ScopedSymbolTable::initBuiltIns() {
+bool ScopedSymbolTable::initBuiltIns() {
     builtInsMap[builtInSymbols::INT] = new BuiltInTypeSymbol("INTEGER");
     builtInsMap[builtInSymbols::REAL] = new BuiltInTypeSymbol("REAL");
     builtInsMap[builtInSymbols::STRING] = new BuiltInTypeSymbol("STRING");    
     builtInsMap[builtInSymbols::ANY] = new BuiltInTypeSymbol("ANY");
+    return false;
 }
 
 string ScopedSymbolTable::toString() const {
